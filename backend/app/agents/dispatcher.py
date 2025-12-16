@@ -24,6 +24,16 @@ def router_node(state: AgentState):
         elif "# " in current_code and ("- " in current_code or "##" in current_code):
              active_context = "Mindmap (Markdown)"
 
+    agent_descriptions = {
+        "mindmap": "Best for hierarchical structures, brainstorming, outlining ideas, and organizing concepts. Output: Markdown/Markmap.",
+        "flow": "Best for sequential processes, workflows, decision trees, and logic flows. Output: Mermaid Flowchart.",
+        "charts": "Best for quantitative data visualization (sales, stats, trends). Output: ECharts (Bar, Line, Pie, etc.).",
+        "drawio": "Best for complex architecture diagrams, cloud infrastructure (AWS/Azure), UML class diagrams, and network topologies. Output: Draw.io XML. Use this if user explicitly asks for 'Draw.io' or 'architecture'.",
+        "general": "Handles greetings, questions unrelated to diagramming, or requests that don't fit other categories."
+    }
+
+    descriptions_text = "\n".join([f"- '{key}': {desc}" for key, desc in agent_descriptions.items()])
+
     system_prompt = f"""You are an Intent Router. 
     Analyze the user's request and the conversation history to classify the intent into one of the categories.
     
@@ -35,12 +45,8 @@ def router_node(state: AgentState):
     2. IF "CURRENT VISUAL CONTEXT" is "Mindmap" AND user asks to "add node", "expand" -> YOU MUST ROUTE TO 'mindmap'.
     3. IF "CURRENT VISUAL CONTEXT" is "Flowchart" AND user asks to "change shape", "connect" -> YOU MUST ROUTE TO 'flow'.
     
-    Categories:
-    - 'mindmap': for creating NEW mind maps or MODIFYING existing ones.
-    - 'flow': for creating NEW flowcharts or MODIFYING existing ones.
-    - 'charts': for creating NEW data visualizations or MODIFYING existing ones.
-    - 'drawio': for creating Draw.io diagrams, architecture diagrams, UML, or network simple.
-    - 'general': only for completely unrelated topics (e.g. "Write a poem", "Hello").
+    Agent Capabilities:
+    {descriptions_text}
     
     Output ONLY the category name.
     """
@@ -49,7 +55,18 @@ def router_node(state: AgentState):
     conversation_text = ""
     for msg in messages:
         role = "User" if msg.type == "human" else "Assistant"
-        conversation_text += f"{role}: {msg.content}\n"
+        content = msg.content
+        if isinstance(content, list):
+            text_parts = []
+            for item in content:
+                if isinstance(item, dict):
+                    if item.get("type") == "text":
+                        text_parts.append(item.get("text", ""))
+                    elif item.get("type") == "image_url":
+                        text_parts.append("[User uploaded an image]")
+            conversation_text += f"{role}: {' '.join(text_parts)}\n"
+        else:
+            conversation_text += f"{role}: {content}\n"
     
     # We pass the full history so the router can see previous context
     # Use a single HumanMessage containing instructions + history to force analysis mode

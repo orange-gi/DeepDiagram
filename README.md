@@ -24,7 +24,12 @@
 ### ✏️ Draw.io Agent
 - **Powered by**: `mxGraph` (Draw.io)
 - **Capabilities**: Produces professional-grade technical diagrams compatible with the Draw.io ecosystem.
-- **Workflow**: Generates valid XML for seamless integration and editing.
+    - **Capabilities**: Produces professional-grade technical diagrams compatible with the Draw.io ecosystem.
+    - **Workflow**: Generates valid XML for seamless integration and editing.
+
+### 🤖 Intelligent Router & Multimodal
+- **Context-Aware**: Automatically routes requests to the best agent based on intent (e.g., "Draw logic" -> Flow, "Architecture" -> Draw.io).
+- **Multimodal**: Supports image uploads for all agents. Upload a whiteboard photo, and DeepDiagram will convert it into a digital structure.
 
 ---
 
@@ -109,11 +114,10 @@ Visit `http://localhost:5173` (or the port shown in your terminal) to start usin
 
 ## 📖 Usage Guide
 
-1.  **Select an Agent**: Use the tabs in the chat panel to switch between MindMap, Flow, Chart, or Draw.io modes.
-2.  **Describe Your Request**:
-    -   *MindMap*: "Create a mind map for a marketing strategy."
-    -   *Flow*: "Draw a login sequence diagram."
-    -   *Chart*: "Show a bar chart of sales data: Q1 100, Q2 150..."
+1.  **Natural Language & Multimodal Input**: simply type your request or upload an image.
+    -   *Example*: "Create a mind map for a marketing strategy."
+    -   *Example*: Upload an architecture diagram and say "Recreate this in Draw.io".
+2.  **Automatic Routing**: The Intelligent Router analyzes your request and selects the specialized agent (MindMap, Flow, Chart, or Draw.io).
 3.  **Refine**: You can ask the agent to modify the result (e.g., "Change the chart color to red").
 4.  **Export**: Use the toolbar to copy code or download images.
 
