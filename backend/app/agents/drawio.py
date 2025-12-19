@@ -41,18 +41,22 @@ Your goal is to interpret the user's request and generate a valid, uncompressed 
   </diagram>
 </mxfile>
 
-IMPORTANT: Return ONLY the raw XML string. Do not wrap it in markdown code blocks. Do not add explanations.
+IMPORTANT: Return ONLY the raw XML string using the `render_drawio_xml` tool. Do not wrap it in markdown code blocks. Do not add explanations.
+The content of `xml_content` MUST be a non-empty, valid Draw.io XML string.
 """
 
 from langchain_core.tools import tool
 
 @tool
-def render_drawio_xml(xml_content: str):
+def render_drawio_xml(xml_content: str = ""):
     """
     Renders the generated Draw.io XML to the user's canvas.
     Args:
         xml_content: The full, valid Draw.io XML string.
     """
+    if not xml_content:
+        return "Error: No XML content provided."
+    
     # In a real tool, we might validate or parse. 
     # For now, we return it so the frontend tool_end event captures it.
     return xml_content

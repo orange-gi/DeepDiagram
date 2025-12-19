@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import {
-    Send, Loader2, X, Copy, RotateCcw, Check, Command,
+    Send, Loader2, X, Copy, RotateCcw, Check, Command, Square,
     Workflow, Network, Code2, BarChart3, PenTool, AlertCircle, Paperclip
 } from 'lucide-react';
 import { useChatStore } from '../store/chatStore';
@@ -83,6 +83,7 @@ export const ChatPanel = () => {
     const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
     const [showMentions, setShowMentions] = useState(false);
     const [mentionFilter, setMentionFilter] = useState('');
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -195,7 +196,20 @@ export const ChatPanel = () => {
         inputRef.current?.focus();
     };
 
-
+    const stopGeneration = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+            setLoading(false);
+            addStepToLastMessage({
+                type: 'agent_select',
+                name: 'System',
+                content: 'Generation stopped by user.',
+                status: 'done',
+                timestamp: Date.now()
+            });
+        }
+    };
 
     const triggerSubmit = async (customPrompt?: string, customImages?: string[]) => {
         const promptToUse = customPrompt ?? input;
@@ -217,6 +231,9 @@ export const ChatPanel = () => {
         let thoughtBuffer = "";
         let toolArgsBuffer = "";
 
+        // Create new AbortController
+        abortControllerRef.current = new AbortController();
+
         try {
             const response = await fetch('/api/chat/stream', {
                 method: 'POST',
@@ -227,6 +244,7 @@ export const ChatPanel = () => {
                     session_id: sessionId,
                     context: { current_code: currentCode }
                 }),
+                signal: abortControllerRef.current.signal
             });
 
             if (!response.ok) throw new Error('Network response was not ok');
@@ -278,7 +296,9 @@ export const ChatPanel = () => {
                                 const argsDelta = data.args;
                                 if (argsDelta) {
                                     toolArgsBuffer += argsDelta;
-                                    const contentMatch = toolArgsBuffer.match(/"(content|description|data)"\s*:\s*"/);
+                                    // Robustly match the first string argument value, regardless of key name (e.g., content, code, markdown, xml_content, option_str)
+                                    // Regex explanation: Look for a key followed by a colon and a quote. Then capture until the end if no closing quote, or handle escaped quotes.
+                                    const contentMatch = toolArgsBuffer.match(/"(content|description|data|markdown|code|xml_content|option_str)"\s*:\s*"/);
                                     if (contentMatch) {
                                         const startIdx = contentMatch.index! + contentMatch[0].length;
                                         let endIdx = toolArgsBuffer.indexOf('"', startIdx);
@@ -318,11 +338,16 @@ export const ChatPanel = () => {
                     }
                 }
             }
-        } catch (error) {
-            console.error('Error:', error);
-            updateLastMessage(thoughtBuffer + '\n\n[Error encountered]');
+        } catch (error: any) {
+            if (error.name === 'AbortError') {
+                console.log('Fetch aborted');
+            } else {
+                console.error('Error:', error);
+                updateLastMessage(thoughtBuffer + '\n\n[Error encountered]');
+            }
         } finally {
             setLoading(false);
+            abortControllerRef.current = null;
         }
     };
 
@@ -333,11 +358,13 @@ export const ChatPanel = () => {
 
     return (
         <div className="flex flex-col h-full bg-slate-50 overflow-hidden">
-            <div className="p-4 border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-10">
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                    DeepDiagram AI
-                </h1>
-                <p className="text-xs text-slate-500 mt-1">Describe what you want to create or upload an image.</p>
+            <div className="p-4 border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-10 flex items-center justify-between">
+                <div>
+                    <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                        DeepDiagram AI
+                    </h1>
+                    <p className="text-xs text-slate-500 mt-1">Describe what you want to create or upload an image.</p>
+                </div>
             </div>
 
             {/* Global Toast */}
@@ -633,16 +660,18 @@ export const ChatPanel = () => {
 
                             <button
                                 type="button"
-                                onClick={() => void triggerSubmit()}
-                                disabled={isLoading || (!input.trim() && inputImages.length === 0)}
+                                onClick={() => isLoading ? stopGeneration() : void triggerSubmit()}
+                                disabled={!isLoading && (!input.trim() && inputImages.length === 0)}
                                 className={cn(
                                     "flex items-center justify-center w-10 h-10 rounded-full transition-all",
-                                    (!input.trim() && inputImages.length === 0) || isLoading
-                                        ? "bg-slate-200 text-slate-400 pointer-events-none"
-                                        : "bg-blue-600 text-white hover:bg-blue-700 active:scale-95 shadow-md shadow-blue-500/20"
+                                    isLoading
+                                        ? "bg-red-500 text-white hover:bg-red-600 active:scale-95 shadow-md shadow-red-500/20"
+                                        : (!input.trim() && inputImages.length === 0)
+                                            ? "bg-slate-200 text-slate-400 pointer-events-none"
+                                            : "bg-blue-600 text-white hover:bg-blue-700 active:scale-95 shadow-md shadow-blue-500/20"
                                 )}
                             >
-                                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                                {isLoading ? <Square className="w-4 h-4 fill-white" /> : <Send className="w-5 h-5" />}
                             </button>
                         </div>
                     </div>

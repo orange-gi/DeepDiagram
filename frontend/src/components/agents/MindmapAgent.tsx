@@ -115,6 +115,8 @@ export const MindmapAgent = forwardRef<AgentRef>((_, ref) => {
             });
 
             mindmapInstanceRef.current = me;
+        } else {
+            mindmapInstanceRef.current.init(data);
         }
     }, [currentCode, setCurrentCode]);
 

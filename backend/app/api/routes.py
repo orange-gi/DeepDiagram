@@ -135,16 +135,19 @@ async def event_generator(request: ChatRequest, db: AsyncSession) -> AsyncGenera
                                 yield f"event: tool_args_stream\ndata: {json.dumps({'args': args_chunk})}\n\n"
 
             elif event_type == "on_tool_start":
+                logger.info(f"Tool started: {event['name']} with input: {data.get('input')}")
                 yield f"event: tool_start\ndata: {json.dumps({'tool': event['name'], 'input': data.get('input')})}\n\n"
 
             elif event_type == "on_tool_end":
                 output = data.get('output')
+                logger.info(f"Tool ended: {event['name']} with output type: {type(output)}")
                 if hasattr(output, 'content'):
                     output = output.content
                 elif isinstance(output, (dict, list, str, int, float, bool, type(None))):
                     pass # Already serializable
                 else:
                     output = str(output)
+                logger.info(f"Final tool output (truncated): {str(output)[:100]}...")
                 yield f"event: tool_end\ndata: {json.dumps({'output': output})}\n\n"
         
         # 4. Save Assistant Message
