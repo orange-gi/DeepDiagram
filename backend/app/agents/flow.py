@@ -9,14 +9,15 @@ llm = get_llm()
 @tool
 def create_flow(code: str):
     """
-    Renders a Mermaid flowchart.
+    Renders an interactive flowchart using React Flow.
     Args:
-        code: The complete Mermaid syntax code (e.g., starts with 'graph TD' or 'flowchart LR').
+        code: A JSON string containing 'nodes' and 'edges' arrays.
     """
-    # Simply return the code so the frontend can render it.
-    # We might want to strip markdown code blocks if the LLM includes them.
-    cleaned_code = code.replace("```mermaid", "").replace("```", "").strip()
-    return cleaned_code
+    # Robustly strip markdown code blocks
+    import re
+    cleaned_code = re.sub(r'^```[a-zA-Z]*\n', '', code)
+    cleaned_code = re.sub(r'\n```$', '', cleaned_code)
+    return cleaned_code.strip()
 
 @tool
 def modify_flow(instruction: str, current_code: str):
@@ -40,35 +41,27 @@ llm_with_tools = llm.bind_tools(tools)
 async def flow_agent_node(state: AgentState):
     messages = state['messages']
     
-    system_prompt = SystemMessage(content="""You are an expert Flowchart Generator and Image Analyst.
-    Your goal is to generate ACCURATE, COMPLEX Mermaid flowchart code.
-
-    ### CRITICAL: HOW TO HANDLE IMAGES
-    If the user provides an image (e.g., a technical diagram, architecture, or workflow):
-    1. **VISUAL ANALYSIS**: breakdown every node (box, diamond, circle), connection (arrow), and label text in the image.
-    2. **STRUCTURAL FIDELITY**: You MUST reproduce the EXACT structure. 
-       - If there is a "Decision Diamond" (Check 80%?), use `id{Text}` syntax.
-       - If there are branches (Yes/No), ensure the arrows have labels: `A -- Yes --> B`.
-       - If there are subgraphs (dotted boxes), use `subgraph Title ... end`.
-    3. **TEXT EXTRACTION**: Transcribe the text inside nodes exactly as it appears.
-
-    ### MERMAID SYNTAX RULES
-    - Start with `graph TD` (Top-Down) or `graph LR` (Left-Right) based on the image layout.
-    - Use meaningful IDs (e.g., `Start`, `Process1`, `Decision`) or `A`, `B`, `C` if simple.
-    - Node Syntax:
-       - Rectangle: `id[Text]`
-       - Round Rect: `id(Text)`
-       - Circle: `id((Text))`
-       - Rhombus (Decision): `id{Text}`
-    - Edge Syntax:
-       - Arrow: `A --> B`
-       - Dotted: `A -.-> B`
-       - With Text: `A -- Text --> B`
-
-    ### EXECUTION
-    - You MUST call the `create_flow` tool.
-    - The argument `code` must be the VALID, COMPLETE Mermaid syntax.
-    - Do NOT wrap the code in markdown blocks (```) inside the tool argument. just the raw string.
+    system_prompt = SystemMessage(content="""You are an expert Flowchart Generator.
+    Your goal is to generate interactive flowcharts in JSON format for React Flow.
+    
+    ### CRITICAL: NO MERMAID SYNTAX
+    The system NO LONGER supports Mermaid syntax for flowcharts. Even if the user explicitly asks for "Mermaid", you MUST output the equivalent React Flow JSON structure.
+    
+    ### OUTPUT FORMAT (JSON)
+    You MUST call the `create_flow` tool with a valid JSON string containing `nodes` and `edges`:
+    {
+      "nodes": [
+        { "id": "1", "data": { "label": "Start" }, "position": { "x": 0, "y": 0 }, "type": "default" },
+        ...
+      ],
+      "edges": [
+        { "id": "e1-2", "source": "1", "target": "2", "label": "Yes", "animated": true },
+        ...
+      ]
+    }
+    
+    ### POSITIONING
+    Assign reasonable x and y coordinates to nodes (e.g., vertical or horizontal flow) so they don't overlap and are clearly laid out.
     """)
     
     response = await llm_with_tools.ainvoke([system_prompt] + messages)

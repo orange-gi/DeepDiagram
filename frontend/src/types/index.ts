@@ -1,4 +1,4 @@
-export type AgentType = 'mindmap' | 'flow' | 'charts' | 'drawio' | 'general';
+export type AgentType = 'mindmap' | 'flow' | 'charts' | 'drawio' | 'mermaid' | 'general';
 
 export interface Step {
     type: 'agent_select' | 'tool_start' | 'tool_end';
@@ -6,6 +6,8 @@ export interface Step {
     content?: string; // Input or Output
     status?: 'running' | 'done' | 'error';
     timestamp?: number;
+    error?: string;
+    isError?: boolean;
 }
 
 export interface Message {
@@ -35,9 +37,17 @@ export interface ChatState {
     setCurrentCode: (code: string) => void;
     setLoading: (loading: boolean) => void;
     setSessionId: (id: number) => void;
+    setMessages: (messages: Message[]) => void;
     updateLastMessage: (content: string) => void;
     setInputImages: (images: string[]) => void;
     addInputImage: (image: string) => void;
     clearInputImages: () => void;
     addStepToLastMessage: (step: import('../types').Step) => void;
+    markLastStepAsError: (error: string) => void;
+    activeStepRef: { messageIndex: number; stepIndex: number } | null;
+    setActiveStepRef: (ref: { messageIndex: number; stepIndex: number } | null) => void;
+    reportError: (error: string) => void;
+    reportSuccess: () => void;
+    toast: { message: string; type: 'error' | 'success' } | null;
+    clearToast: () => void;
 }

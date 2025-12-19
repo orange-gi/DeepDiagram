@@ -44,6 +44,10 @@ async def mindmap_agent_node(state: AgentState):
     - **Hierarchy**: Indent bullet points to create sub-branches.
     - **Formatting**: You can use **bold**, *italic*, and [links](url).
 
+    ### INTERACTIONS
+    - The user can directly edit, add, or delete nodes on the canvas.
+    - If they ask for content changes, generate the FULL updated markdown.
+
     ### EXECUTION
     - You MUST call the `create_mindmap` tool.
     - The argument `markdown` must be the VALID, COMPLETE markdown string.

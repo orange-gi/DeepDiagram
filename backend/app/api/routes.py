@@ -8,6 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.services.chat import ChatService
 import json
 from typing import AsyncGenerator
+from app.core.logger import logger
 
 router = APIRouter()
 
@@ -151,7 +152,11 @@ async def event_generator(request: ChatRequest, db: AsyncSession) -> AsyncGenera
             await chat_service.add_message(session_id, "assistant", full_response_content)
             
     except Exception as e:
-        yield f"event: error\ndata: {json.dumps({'message': str(e)})}\n\n"
+        import traceback
+        error_msg = str(e)
+        logger.error(f"Error in chat stream: {error_msg}")
+        logger.error(traceback.format_exc())
+        yield f"event: error\ndata: {json.dumps({'message': error_msg})}\n\n"
 
 @router.post("/chat/stream")
 async def chat_stream(request: ChatRequest, db: AsyncSession = Depends(get_session)):

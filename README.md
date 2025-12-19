@@ -1,41 +1,57 @@
-# DeepDiagram: Agentic AI Visualization Platform
+# DeepDiagram AI: Agentic AI Visualization Platform
 
-**DeepDiagram** is an open-source, intelligent visualization platform that leverages **Agentic AI** to transform natural language into professional diagrams. Unlike traditional drag-and-drop tools, DeepDiagram employs a multi-agent architecture where specialized agents handle different visualization domains—from mind maps to complex data charts.
+**DeepDiagram AI** is an open-source, intelligent visualization platform that leverages **Agentic AI** to transform natural language into professional diagrams. Unlike traditional tools, DeepDiagram employs a multi-agent architecture where specialized agents handle different visualization domains—from interactive mind maps to complex data charts.
 
 ---
 
 ## 🚀 Features
 
 ### 🧠 Mind Map Agent
-- **Powered by**: `markmap-lib`
-- **Capabilities**: Generates structured mind maps for brainstorming, note-taking, and outlining.
-- **Workflow**: Converts text summaries and hierarchical data into interactive Markdown-based maps.
+- **Powered by**: `mind-elixir`
+- **Capabilities**: Generates structured, interactive mind maps.
+- **Workflow**: Supports real-time preview and export to PNG.
 
 ### 🧜‍♂️ Flowchart Agent
-- **Powered by**: `mermaid.js`
-- **Capabilities**: Creates detailed flowcharts, sequence diagrams, Gantt charts, and class diagrams.
-- **Workflow**: Translates logic and process descriptions into valid Mermaid syntax.
+- **Powered by**: `React Flow`
+- **Capabilities**: Creates detailed flowcharts with a modern, interactive canvas.
+- **Workflow**: Supports auto-layout and high-quality image export.
 
 ### 📊 Data Chart Agent
-- **Powered by**: `apache-echarts`
+- **Powered by**: `Apache ECharts`
 - **Capabilities**: Visualizes data using bar charts, line graphs, pie charts, and more.
-- **Workflow**: Analyzes CSV/JSON data or descriptions to generate Echarts configurations.
+- **Workflow**: Analyzes data or descriptions to generate rich ECharts configurations.
 
 ### ✏️ Draw.io Agent
-- **Powered by**: `mxGraph` (Draw.io)
+- **Powered by**: `Draw.io` (Atlas Theme)
 - **Capabilities**: Produces professional-grade technical diagrams compatible with the Draw.io ecosystem.
-    - **Capabilities**: Produces professional-grade technical diagrams compatible with the Draw.io ecosystem.
-    - **Workflow**: Generates valid XML for seamless integration and editing.
+- **Workflow**: Advanced canvas with **auto-centering** and **sidebar concealment** for a focused drawing experience.
+
+### 🧜‍♀️ Mermaid Agent
+- **Powered by**: `Mermaid.js` + `react-zoom-pan-pinch`
+- **Capabilities**: Generates complex diagrams including Sequence, Gantt, Timeline, State, and Class diagrams.
+- **Workflow**: Native interactive canvas with adaptive scaling, zoom/pan controls, and high-resolution SVG/PNG export.
 
 ### 🤖 Intelligent Router & Multimodal
-- **Context-Aware**: Automatically routes requests to the best agent based on intent (e.g., "Draw logic" -> Flow, "Architecture" -> Draw.io).
-- **Multimodal**: Supports image uploads for all agents. Upload a whiteboard photo, and DeepDiagram will convert it into a digital structure.
+- **Context-Aware**: Automatically routes requests to the best agent based on intent using a ReAct-based orchestration layer.
+- **Multimodal**: Supports image uploads. Upload a whiteboard photo or a sketch, and DeepDiagram AI will digitize it.
+
+---
+
+## ✨ User Interface Enhancements
+
+- **Modern Chat Input**: Redesigned input card with a clean, border-box layout and bottom-aligned action buttons (Paperclip for uploads, Send for submission).
+- **Stable Layout**: Image previews are positioned above agent shortcuts to ensure the toolbar remains static and accessible during uploads.
+- **Resizable Layout**: Flexibly adjust the width of the drawing canvas and chat panel using a professional-grade draggable separator.
+- **Process Trace Actions**:
+  - **Contextual Render**: Trigger agent-specific rendering directly from the process trace.
+  - **Live Feedback**: Real-time status tags (e.g., "Render Failed") that clear instantly on successful re-runs.
+  - **Trace Logs**: Formatted JSON logs for debugging and transparency.
 
 ---
 
 ## 🏗 System Architecture
 
-DeepDiagram uses a **React + FastAPI** architecture, orchestrated by **LangGraph**. The system routs user intents to specific agents, which use **MCP (Model Context Protocol)** style tools to generate or modify content. Updates are streamed to the frontend via **SSE (Server-Sent Events)** for a "Think-while-drawing" experience.
+DeepDiagram AI uses a **React + FastAPI** architecture, orchestrated by **LangGraph**. Updates are streamed to the frontend via **SSE (Server-Sent Events)** for a live preview experience.
 
 ```mermaid
 graph TD
@@ -44,16 +60,17 @@ graph TD
     Router -->|Intent: Flow| AgentB[Flow Agent]
     Router -->|Intent: Data| AgentC[Chart Agent]
     Router -->|Intent: Draw.io| AgentD[Draw.io Agent]
+    Router -->|Intent: Mermaid| AgentE[Mermaid Agent]
     
     subgraph Agent Loop [ReAct Architecture]
         AgentA & AgentB & AgentC & AgentD --> Think{Thinking}
         Think -->|Call Tool| Tools[MCP Tools]
         Tools -->|Result| Think
-        Think -->|Final Answer| Output[Code/XML Generation]
+        Think -->|Final Answer| Output[Code/XML/JSON Generation]
     end
     
     Output -->|SSE Stream| Frontend[React Client]
-    Frontend -->|Render| Canvas[Canvas Panel]
+    Frontend -->|Render| Canvas[Resizable Canvas Panel]
     
     style User fill:#f9f,stroke:#333
     style Router fill:#bbf,stroke:#333
@@ -64,9 +81,9 @@ graph TD
 
 ## 🛠 Tech Stack
 
-- **Frontend**: React 18, Vite, TypeScript, TailwindCSS, Zustand
-- **Backend**: Python 3.10+, FastAPI, LangGraph, LangChain
-- **Package Manager**: `uv` (Python), `npm` (Node.js)
+- **Frontend**: React 19, Vite, TypeScript, TailwindCSS, Zustand, React Flow, Mind-elixir, react-resizable-panels.
+- **Backend**: Python 3.10+, FastAPI, LangGraph, LangChain, DeepSeek/OpenAI.
+- **Package Manager**: `uv` (Python), `npm` (Node.js).
 
 ---
 
@@ -75,51 +92,32 @@ graph TD
 ### Prerequisites
 - **Python**: 3.10 or higher
 - **Node.js**: v18 or higher
-- **uv**: An extremely fast Python package installer and resolver (`pip install uv`).
+- **uv**: `pip install uv`
 
 ### 1. Backend Setup
-
-The backend handles AI orchestration and API services.
-
 ```bash
 cd backend
-
-# Create virtual environment and install dependencies
 uv sync
-
-# Activate the virtual environment
-source .venv/bin/activate
-
-# Start the server (runs on http://localhost:8000)
 bash start_backend.sh
 ```
 
 ### 2. Frontend Setup
-
-The frontend provides the chat interface and diagram rendering canvas.
-
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start the development server
 npm run dev
 ```
 
-Visit `http://localhost:5173` (or the port shown in your terminal) to start using DeepDiagram.
+Visit `http://localhost:5173` to start using DeepDiagram AI.
 
 ---
 
 ## 📖 Usage Guide
 
-1.  **Natural Language & Multimodal Input**: simply type your request or upload an image.
-    -   *Example*: "Create a mind map for a marketing strategy."
-    -   *Example*: Upload an architecture diagram and say "Recreate this in Draw.io".
-2.  **Automatic Routing**: The Intelligent Router analyzes your request and selects the specialized agent (MindMap, Flow, Chart, or Draw.io).
-3.  **Refine**: You can ask the agent to modify the result (e.g., "Change the chart color to red").
-4.  **Export**: Use the toolbar to copy code or download images.
+1.  **Natural Language & Multimodal**: Type your request or upload an image (e.g., "Create a flow chart for user login").
+2.  **Interactive Canvas**: Drag and resize the panels to suit your workflow.
+3.  **Export & Share**: Use the toolbar over the diagram to download as PNG or SVG.
+4.  **Refine**: Ask the AI to tweak the result (e.g., "Add a 'Forgot Password' step to the flow").
 
 ---
 
@@ -127,6 +125,9 @@ Visit `http://localhost:5173` (or the port shown in your terminal) to start usin
 
 - [x] MVP with 3 Core Agents (MindMap, Flow, Charts)
 - [x] Draw.io Integration
-- [ ] Collaborative Editing
-- [ ] Export to PDF/PPT
-- [ ] "Report Agent" for comprehensive document generation
+- [x] Standalone Mermaid Agent
+- [x] Resizable Dashboard Layout
+- [x] Enhanced Message Actions & Copy Logic
+- [ ] chat history 
+- [ ] new chat   
+- [ ] other file upload

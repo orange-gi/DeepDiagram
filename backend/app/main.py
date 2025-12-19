@@ -26,3 +26,18 @@ async def on_startup():
 @app.get("/")
 async def root():
     return {"message": "DeepDiagram API is running"}
+
+# Global Exception Handler
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from app.core.logger import logger
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    logger.error(f"Global error occurred: {exc}")
+    logger.error(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"message": "Internal Server Error", "detail": str(exc)},
+    )

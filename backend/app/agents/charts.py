@@ -72,6 +72,10 @@ async def charts_agent_node(state: AgentState):
     - **Pie Charts**: DO NOT use xAxis/yAxis. Use `series: [{{ type: 'pie', data: [{{name:..., value:...}}] }}]`.
     - **Pareto Charts**: Use dual y-axes. Left logic for 'bar' (counts), Right axis for 'line' (cumulative percentage).
 
+    ### USER INTERACTION
+    - The user can locally edit the chart data/logic using the "Data View" tool in the ECharts toolbox on the canvas.
+    - If they ask for changes, proceed as usual by calling the tool with updated JSON.
+
     ### EXECUTION
     - If data is missing (e.g. "Draw a sales chart"), GENERATE realistic dummy data.
     - **DO NOT** output the JSON in the chat message. ONLY use the tool.

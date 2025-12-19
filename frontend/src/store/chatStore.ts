@@ -9,6 +9,8 @@ export const useChatStore = create<ChatState>((set) => ({
     isLoading: false,
     sessionId: null,
     inputImages: [],
+    toast: null, // Simple toast state
+    activeStepRef: null,
 
     setInput: (input) => set({ input }),
     setAgent: (agent) => set({ activeAgent: agent }),
@@ -16,6 +18,7 @@ export const useChatStore = create<ChatState>((set) => ({
     setCurrentCode: (code) => set({ currentCode: code }),
     setLoading: (loading) => set({ isLoading: loading }),
     setSessionId: (id) => set({ sessionId: id }),
+    setMessages: (messages: Message[]) => set({ messages }),
     updateLastMessage: (content) => set((state) => {
         const msgs = [...state.messages];
         if (msgs.length > 0 && msgs[msgs.length - 1].role === 'assistant') {
@@ -34,12 +37,58 @@ export const useChatStore = create<ChatState>((set) => ({
             const lastMsg = msgs[msgs.length - 1];
             if (lastMsg.role === 'assistant') {
                 lastMsg.steps = lastMsg.steps || [];
-                // If this is a 'tool_end', try to find matching 'tool_start' and update it? 
-                // Or just append log? The user asked to "show what agent and tools are called".
-                // Detailed log is better.
                 lastMsg.steps.push(step);
             }
         }
         return { messages: msgs };
     }),
+
+
+    setActiveStepRef: (ref) => set({ activeStepRef: ref }),
+
+    reportError: (errorMsg) => set((state) => {
+        const msgs = [...state.messages];
+        let targetStep = null;
+
+        if (state.activeStepRef) {
+            const { messageIndex, stepIndex } = state.activeStepRef;
+            if (msgs[messageIndex] && msgs[messageIndex].steps && msgs[messageIndex].steps![stepIndex]) {
+                targetStep = msgs[messageIndex].steps![stepIndex];
+            }
+        } else if (msgs.length > 0) {
+            // Fallback to last step of last message
+            const lastMsg = msgs[msgs.length - 1];
+            if (lastMsg.steps && lastMsg.steps.length > 0) {
+                targetStep = lastMsg.steps[lastMsg.steps.length - 1];
+            }
+        }
+
+        if (targetStep) {
+            targetStep.isError = true;
+            targetStep.error = errorMsg;
+            // Force re-render of components using messages
+            return { messages: msgs, toast: { message: errorMsg, type: 'error' } };
+        }
+
+        return { toast: { message: errorMsg, type: 'error' } };
+    }),
+
+    reportSuccess: () => set((state) => {
+        if (!state.activeStepRef) return {}; // Do nothing if not explicit re-render? Or clear last?
+
+        const msgs = [...state.messages];
+        const { messageIndex, stepIndex } = state.activeStepRef;
+
+        if (msgs[messageIndex] && msgs[messageIndex].steps && msgs[messageIndex].steps![stepIndex]) {
+            const targetStep = msgs[messageIndex].steps![stepIndex];
+            targetStep.isError = false;
+            targetStep.error = undefined;
+            return { messages: msgs };
+        }
+        return {};
+    }),
+
+    markLastStepAsError: (errorMsg) => useChatStore.getState().reportError(errorMsg),
+
+    clearToast: () => set({ toast: null }),
 }));
