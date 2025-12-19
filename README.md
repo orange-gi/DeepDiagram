@@ -11,25 +11,35 @@
 - **Capabilities**: Generates structured, interactive mind maps.
 - **Workflow**: Supports real-time preview and export to PNG.
 
+![Mind Map Agent Demo](./images/mindmap.png)
+
 ### 🧜‍♂️ Flowchart Agent
 - **Powered by**: `React Flow`
 - **Capabilities**: Creates detailed flowcharts with a modern, interactive canvas.
 - **Workflow**: Supports auto-layout and high-quality image export.
+
+![Flowchart Agent Demo](./images/flow.png)
 
 ### 📊 Data Chart Agent
 - **Powered by**: `Apache ECharts`
 - **Capabilities**: Visualizes data using bar charts, line graphs, pie charts, and more.
 - **Workflow**: Analyzes data or descriptions to generate rich ECharts configurations.
 
+![Data Chart Agent Demo](./images/chart.png)
+
 ### ✏️ Draw.io Agent
 - **Powered by**: `Draw.io` (Atlas Theme)
 - **Capabilities**: Produces professional-grade technical diagrams compatible with the Draw.io ecosystem.
 - **Workflow**: Advanced canvas with **auto-centering** and **sidebar concealment** for a focused drawing experience.
 
+![Draw.io Agent Demo](./images/draw.png)
+
 ### 🧜‍♀️ Mermaid Agent
 - **Powered by**: `Mermaid.js` + `react-zoom-pan-pinch`
 - **Capabilities**: Generates complex diagrams including Sequence, Gantt, Timeline, State, and Class diagrams.
 - **Workflow**: Native interactive canvas with adaptive scaling, zoom/pan controls, and high-resolution SVG/PNG export.
+
+![Mermaid Agent Demo](./images/mermaid.png)
 
 ### 🤖 Intelligent Router & Multimodal
 - **Context-Aware**: Automatically routes requests to the best agent based on intent using a ReAct-based orchestration layer.

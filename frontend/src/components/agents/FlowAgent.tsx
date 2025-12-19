@@ -236,7 +236,7 @@ export const FlowAgent = forwardRef<AgentRef>((_, ref) => {
                 // Ignore parsing errors
             }
         }
-    }, [currentCode]);
+    }, [currentCode, isLoading]);
 
     return (
         <div className="w-full h-full">
