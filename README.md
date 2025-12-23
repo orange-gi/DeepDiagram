@@ -67,26 +67,35 @@ DeepDiagram AI uses a **React + FastAPI** architecture, orchestrated by **LangGr
 
 ```mermaid
 graph TD
-    User[User Input] --> Router[Intent Router]
-    Router -->|Intent: MindMap| AgentA[MindMap Agent]
-    Router -->|Intent: Flow| AgentB[Flow Agent]
-    Router -->|Intent: Data| AgentC[Chart Agent]
-    Router -->|Intent: Draw.io| AgentD[Draw.io Agent]
-    Router -->|Intent: Mermaid| AgentE[Mermaid Agent]
-    
-    subgraph Agent Loop [ReAct Architecture]
-        AgentA & AgentB & AgentC & AgentD --> Think{Thinking}
-        Think -->|Call Tool| Tools[MCP Tools]
-        Tools -->|Result| Think
-        Think -->|Final Answer| Output[Code/XML/JSON Generation]
+    Input[User Request: Text/Images] --> Router[Intelligent Router]
+    Router -- State Sync --> Graph[LangGraph Orchestrator]
+
+    subgraph Agents [Specialized Agents]
+        AgentMM[MindMap Agent]
+        AgentFlow[Flowchart Agent]
+        AgentChart[Data Chart Agent]
+        AgentDraw[Draw.io Agent]
+        AgentMermaid[Mermaid Agent]
+        AgentGen[General Agent]
     end
-    
-    Output -->|SSE Stream| Frontend[React Client]
-    Frontend -->|Render| Canvas[Resizable Canvas Panel]
-    
-    style User fill:#f9f,stroke:#333
+
+    Graph --> Agents
+
+    subgraph Loop [ReAct Mechanism]
+        Agents --> LLM{LLM Reasoning}
+        LLM -->|Tool Call| Tools[MCP Tools/Plugins]
+        Tools -->|Execution Result| LLM
+        LLM -->|Final Response| Code[Structured Code/XML/JSON]
+    end
+
+    Code -->|SSE Stream| Backend[FastAPI Backend]
+    Backend -->|Live Preview| Frontend[React 19 Frontend]
+    Frontend -->|Render| Canvas[Interactive Canvas]
+
+    style Input fill:#f9f,stroke:#333
     style Router fill:#bbf,stroke:#333
-    style Frontend fill:#bfb,stroke:#333
+    style Code fill:#bfb,stroke:#333
+    style Canvas fill:#fdf,stroke:#333
 ```
 
 ---

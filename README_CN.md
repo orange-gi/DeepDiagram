@@ -67,26 +67,35 @@ DeepDiagram AI 使用 **React + FastAPI** 架构，并由 **LangGraph** 进行�
 
 ```mermaid
 graph TD
-    User[用户输入] --> Router[意图路由]
-    Router -->|意图: 思维导图| AgentA[思维导图智能体]
-    Router -->|意图: 流程图| AgentB[流程图智能体]
-    Router -->|意图: 数据图表| AgentC[图表智能体]
-    Router -->|意图: Draw.io| AgentD[Draw.io 智能体]
-    Router -->|意图: Mermaid| AgentE[Mermaid 智能体]
-    
-    subgraph Agent Loop [ReAct 架构]
-        AgentA & AgentB & AgentC & AgentD --> Think{思考}
-        Think -->|调用工具| Tools[MCP 工具]
-        Tools -->|结果| Think
-        Think -->|最终回答| Output[代码/XML/JSON 生成]
+    Input[用户请求: 文字/图片] --> Router[智能路由]
+    Router -- 状态同步 --> Graph[LangGraph 编排层]
+
+    subgraph Agents [专业智能体]
+        AgentMM[思维导图智能体]
+        AgentFlow[流程图智能体]
+        AgentChart[数据图表智能体]
+        AgentDraw[Draw.io 智能体]
+        AgentMermaid[Mermaid 智能体]
+        AgentGen[通用智能体]
     end
-    
-    Output -->|SSE 流| Frontend[React 客户端]
-    Frontend -->|渲染| Canvas[可调节画布面板]
-    
-    style User fill:#f9f,stroke:#333
+
+    Graph --> Agents
+
+    subgraph Loop [ReAct 机制]
+        Agents --> LLM{LLM 推理}
+        LLM -->|工具调用| Tools[MCP 工具/插件]
+        Tools -->|执行结果| LLM
+        LLM -->|最终响应| Code[结构化代码: Code/XML/JSON]
+    end
+
+    Code -->|SSE 流| Backend[FastAPI 后端]
+    Backend -->|实时预览| Frontend[React 19 前端]
+    Frontend -->|渲染| Canvas[交互式画布面板]
+
+    style Input fill:#f9f,stroke:#333
     style Router fill:#bbf,stroke:#333
-    style Frontend fill:#bfb,stroke:#333
+    style Code fill:#bfb,stroke:#333
+    style Canvas fill:#fdf,stroke:#333
 ```
 
 ---
