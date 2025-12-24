@@ -113,28 +113,46 @@ graph TD
 
 ---
 
-## 🏁 快速开始
+## 🏁 开始使用
 
-### 前提条件
+### 前置条件
 - **Python**: 3.10 或更高版本
-- **Node.js**: v18 或更高版本
-- **uv**: `pip install uv`
+- **Node.js**: v20 或更高版本
+- **Docker & Docker Compose**: 推荐用于生产环境
 
-### 1. 后端设置
+### 方案 1: 开发环境
+#### 1. 后端设置
 ```bash
 cd backend
 uv sync
 bash start_backend.sh
 ```
 
-### 2. 前端设置
+#### 2. 前端设置
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+访问 `http://localhost:5173`。
 
-访问 `http://localhost:5173` 开始使用 DeepDiagram AI。
+### 方案 2: Docker 部署 (推荐)
+你可以使用 Docker Compose 一键部署整个堆栈。这将启动前端、后端和 PostgreSQL 数据库。
+
+#### 1. 配置
+在根目录下创建一个 `.env` 文件，填入你的 API 密钥：
+```env
+OPENAI_API_KEY=your_key_here
+OPENAI_BASE_URL=https://api.openai.com
+DEEPSEEK_API_KEY=your_key_here
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+```
+
+#### 2. 启动
+```bash
+docker-compose up -d
+```
+访问 `http://localhost`。前端将由 Nginx 在 80 端口提供服务，并自动将 API 请求转发到后端。
 
 ---
 

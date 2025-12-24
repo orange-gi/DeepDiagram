@@ -117,24 +117,42 @@ graph TD
 
 ### Prerequisites
 - **Python**: 3.10 or higher
-- **Node.js**: v18 or higher
-- **uv**: `pip install uv`
+- **Node.js**: v20 or higher
+- **Docker & Docker Compose**: Recommended for production
 
-### 1. Backend Setup
+### Option 1: Development Setup
+#### 1. Backend Setup
 ```bash
 cd backend
 uv sync
 bash start_backend.sh
 ```
 
-### 2. Frontend Setup
+#### 2. Frontend Setup
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+Visit `http://localhost:5173`.
 
-Visit `http://localhost:5173` to start using DeepDiagram AI.
+### Option 2: Docker Deployment (Recommended)
+You can deploy the entire stack using Docker Compose. This will start the frontend, backend, and a PostgreSQL database.
+
+#### 1. Configuration
+Create a `.env` file in the root directory with your API keys:
+```env
+OPENAI_API_KEY=your_key_here
+OPENAI_BASE_URL=https://api.openai.com
+DEEPSEEK_API_KEY=your_key_here
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+```
+
+#### 2. Launch
+```bash
+docker-compose up -d
+```
+Visit `http://localhost`. The frontend will be served by Nginx on port 80 and will automatically proxy API requests to the backend.
 
 ---
 
