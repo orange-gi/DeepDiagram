@@ -97,7 +97,7 @@ const StepItem = ({ step, activeAgent, messageIndex, associatedResult, onRetry }
                     {step.isStreaming && (
                         <span className="ml-2 px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-600 rounded border border-blue-200 flex items-center gap-1 inline-flex">
                             <Activity className="w-2.5 h-2.5 animate-pulse" />
-                            Streaming...
+                            Generating...
                         </span>
                     )}
                 </div>

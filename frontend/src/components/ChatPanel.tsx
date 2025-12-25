@@ -694,9 +694,12 @@ export const ChatPanel = () => {
                                 >
                                     {msg.content}
                                 </ReactMarkdown>
-                                {isGenerating && !hasContent && (
-                                    <div className="flex items-center space-x-2 py-1 animate-pulse">
-                                        <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+                                {isGenerating && (
+                                    <div className={cn(
+                                        "flex items-center space-x-2 py-1 animate-pulse",
+                                        hasContent && "mt-2 pt-2 border-t border-slate-100/50"
+                                    )}>
+                                        <Loader2 className="w-3 h-3 animate-spin text-indigo-500" />
                                         <span className="text-xs text-slate-400 font-medium">Thinking...</span>
                                     </div>
                                 )}
