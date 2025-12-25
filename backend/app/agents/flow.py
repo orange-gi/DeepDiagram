@@ -38,7 +38,8 @@ Nodes MUST be placed on a clean grid.
   ]
 }
 
-Return ONLY raw JSON. NO markdown code blocks.
+Return ONLY raw JSON. NO markdown code blocks (e.g. ```json ... ```).
+Do NOT include any explanatory text outside the JSON.
 """
 
 @tool
@@ -66,8 +67,8 @@ async def create_flow(instruction: str):
     
     # Strip potential markdown boxes
     import re
-    cleaned_json = re.sub(r'^```[a-zA-Z]*\n', '', json_str)
-    cleaned_json = re.sub(r'\n```$', '', cleaned_json)
+    cleaned_json = re.sub(r'^```\w*\n?', '', json_str.strip())
+    cleaned_json = re.sub(r'\n?```$', '', cleaned_json.strip())
     
     return cleaned_json.strip()
 

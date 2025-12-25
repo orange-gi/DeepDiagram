@@ -336,11 +336,39 @@ export const FlowAgent = forwardRef<AgentRef>((_, ref) => {
 
             try {
                 let jsonStr = currentCode;
-                const match = currentCode.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-                if (match) {
-                    jsonStr = match[1];
+                let data: any;
+
+                // Helper to try parsing
+                const tryParse = (str: string) => {
+                    try {
+                        return JSON.parse(str);
+                    } catch {
+                        return null;
+                    }
+                };
+
+                // Strategy 1: Direct Parse
+                data = tryParse(jsonStr);
+
+                // Strategy 2: Strip markdown
+                if (!data) {
+                    const match = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+                    if (match) {
+                        data = tryParse(match[1].trim());
+                    }
                 }
-                const data = JSON.parse(jsonStr);
+
+                // Strategy 3: Brute force find first { and last }
+                if (!data) {
+                    const start = jsonStr.indexOf('{');
+                    const end = jsonStr.lastIndexOf('}');
+                    if (start !== -1 && end !== -1 && end > start) {
+                        const candidate = jsonStr.substring(start, end + 1);
+                        data = tryParse(candidate);
+                    }
+                }
+
+                if (!data) throw new Error("Could not parse flow configuration");
                 if (data.nodes && Array.isArray(data.nodes)) {
                     setError(null);
                     // V4 STRUCTURAL FIX: Sanitize and Fix AI garbage

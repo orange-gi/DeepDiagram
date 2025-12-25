@@ -47,21 +47,45 @@ export const ChartsAgent = forwardRef<AgentRef>((_, ref) => {
         try {
             setError(null);
 
-            // Robustly strip markdown blocks if they exist
+            let options: any;
+
+            // Helper to try parsing JSON-like string
+            const tryParse = (str: string) => {
+                try {
+                    return JSON.parse(str);
+                } catch {
+                    try {
+                        // Fallback to Function constructor
+                        return new Function(`return (${str})`)();
+                    } catch {
+                        return null;
+                    }
+                }
+            };
+
+            // Strategy 1: clean code direct parse
             let cleanCode = currentCode.trim();
-            const match = cleanCode.match(/```(?:json|chart)?\s*([\s\S]*?)\s*```/i);
-            if (match) {
-                cleanCode = match[1].trim();
+            options = tryParse(cleanCode);
+
+            // Strategy 2: Strip markdown code blocks
+            if (!options) {
+                const match = cleanCode.match(/```(?:json|chart)?\s*([\s\S]*?)\s*```/i);
+                if (match) {
+                    options = tryParse(match[1].trim());
+                }
             }
 
-            let options: any;
-            try {
-                // Try standard JSON first
-                options = JSON.parse(cleanCode);
-            } catch {
-                // Fallback to Function constructor to support functions/comments in the config
-                options = new Function(`return (${cleanCode})`)();
+            // Strategy 3: Brute force find first { and last }
+            if (!options) {
+                const start = cleanCode.indexOf('{');
+                const end = cleanCode.lastIndexOf('}');
+                if (start !== -1 && end !== -1 && end > start) {
+                    const candidate = cleanCode.substring(start, end + 1);
+                    options = tryParse(candidate);
+                }
             }
+
+            if (!options) throw new Error("Could not parse chart configuration");
 
             const hasAxis = options.xAxis || options.yAxis || (options.grid && !options.series?.some((s: any) => s.type === 'pie'));
 

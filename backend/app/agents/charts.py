@@ -15,8 +15,9 @@ Your goal is to generate professional ECharts configurations (JSON).
 - Identify the data series, categories (labels), and the best chart type (Bar, Line, Pie, Scatter, Radar, etc.) to represent the relationship.
 
 ### OUTPUT INSTRUCTIONS
-- Retrun ONLY a valid JSON string representing the ECharts 'option' object.
-- **Do NOT** wrap in markdown code blocks. Just the raw JSON string.
+- Return ONLY a valid JSON string representing the ECharts 'option' object.
+- **Do NOT** wrap in markdown code blocks (e.g. ```json ... ```). Just the raw JSON string.
+- **Do NOT** include any explanatory text outside the JSON.
 
 ### ECHARTS CONFIGURATION TIPS
 - **Structure**:
@@ -61,8 +62,10 @@ async def create_chart(instruction: str):
     
     # Strip potential markdown boxes
     import re
-    option_str = re.sub(r'^```[a-zA-Z]*\n', '', option_str)
-    option_str = re.sub(r'\n```$', '', option_str)
+    # Remove starting markdown fence (with or without language)
+    option_str = re.sub(r'^```\w*\n?', '', option_str.strip())
+    # Remove ending markdown fence
+    option_str = re.sub(r'\n?```$', '', option_str.strip())
     
     return option_str.strip()
 
