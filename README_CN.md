@@ -6,6 +6,12 @@
 
 ![DeepDiagram AI Demo1](./images/20251225-170102.gif)
 
+![DeepDiagram AI Demo2](./images/20260104-093043.gif)
+
+![DeepDiagram AI Demo3](./images/20260104-093302.gif)
+
+![DeepDiagram AI Demo4](./images/20260104-093459.gif)
+
 ---
 
 ## 🚀 功能特性
