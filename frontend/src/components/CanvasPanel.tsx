@@ -22,10 +22,6 @@ export const CanvasPanel = () => {
     // 当 activeMessageId 或 currentCode 变化时，强制重新挂载组件
     useEffect(() => {
         setRenderKey(prev => prev + 1);
-        console.log('🔄 Forcing re-mount due to state change:', {
-            activeMessageId,
-            currentCode: currentCode.substring(0, 50) + '...'
-        });
     }, [activeMessageId, currentCode]);
 
     // 计算当前消息的版本号
@@ -40,12 +36,6 @@ export const CanvasPanel = () => {
     };
 
     const versionIndex = getCurrentVersionIndex();
-    console.log('🔑 CanvasPanel key components:', {
-        activeMessageId,
-        versionIndex,
-        renderKey,
-        key: `mermaid-${renderKey}`
-    });
 
     const handleDownload = async (type: 'png' | 'svg') => {
         if (agentRef.current) {

@@ -147,11 +147,6 @@ export const MermaidAgent = forwardRef<AgentRef>((_, ref) => {
     }));
 
     useEffect(() => {
-        console.log('🎨 MermaidAgent useEffect triggered:', {
-            currentCode: currentCode ? currentCode.substring(0, 50) + '...' : '(empty)',
-            isStreamingCode,
-            hasContainer: !!containerRef.current
-        });
         setIsLoaded(false);
         if (!currentCode) {
             setSvgContent('');
@@ -160,11 +155,9 @@ export const MermaidAgent = forwardRef<AgentRef>((_, ref) => {
         }
         const renderDiagram = async () => {
             if (!containerRef.current) {
-                console.log('⚠️ No container ref');
                 return;
             }
             // 移除 isStreamingCode 检查，总是渲染
-            console.log('✅ Starting Mermaid render...');
 
             try {
                 setError(null);
@@ -206,7 +199,6 @@ export const MermaidAgent = forwardRef<AgentRef>((_, ref) => {
                     }
                 }, 50);
 
-                console.log('✅ Mermaid render complete');
                 useChatStore.getState().reportSuccess();
             } catch (err) {
                 console.warn("Mermaid parsing/render error:", err);

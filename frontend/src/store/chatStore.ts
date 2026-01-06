@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ChatState, Message, AgentType, Step } from '../types';
+import { setCanvasState } from './canvasState';
 
 export const useChatStore = create<ChatState>((set) => ({
     messages: [],
@@ -267,19 +268,18 @@ export const useChatStore = create<ChatState>((set) => ({
                     activeMessages.push(selected);
                 });
 
-                let lastCode = persistedCode;
+
+                let lastCode = '';
                 let lastAgent: AgentType = 'mindmap';
 
-                // If persistedCode is empty, fallback to walk-back
-                if (!lastCode) {
-                    for (let i = activeMessages.length - 1; i >= 0; i--) {
-                        const msg = activeMessages[i];
-                        if (msg.role === 'assistant' && msg.steps) {
-                            const lastStep = [...msg.steps].reverse().find((s: any) => s.type === 'tool_end' && s.content);
-                            if (lastStep && lastStep.content) {
-                                lastCode = lastStep.content;
-                                break;
-                            }
+                // 始终从 activeMessages 中提取最新代码
+                for (let i = activeMessages.length - 1; i >= 0; i--) {
+                    const msg = activeMessages[i];
+                    if (msg.role === 'assistant' && msg.steps) {
+                        const lastStep = [...msg.steps].reverse().find((s: any) => s.type === 'tool_end' && s.content);
+                        if (lastStep && lastStep.content) {
+                            lastCode = lastStep.content;
+                            break;
                         }
                     }
                 }
@@ -293,6 +293,8 @@ export const useChatStore = create<ChatState>((set) => ({
                     }
                 }
 
+                console.log('🎯 Final state:', { lastCode: lastCode?.substring(0, 100), lastAgent });
+
                 set({
                     messages: activeMessages,
                     allMessages: mappedMessages,
@@ -301,6 +303,13 @@ export const useChatStore = create<ChatState>((set) => ({
                     activeAgent: lastAgent,
                     activeMessageId: activeMessages[activeMessages.length - 1]?.id || null,
                     isLoading: false
+                });
+
+                // 同步到画布状态
+                setCanvasState({
+                    currentCode: lastCode,
+                    activeAgent: lastAgent,
+                    activeMessageId: activeMessages[activeMessages.length - 1]?.id || null
                 });
             }
         } catch (error) {
@@ -319,6 +328,7 @@ export const useChatStore = create<ChatState>((set) => ({
             let lastCode = '';
             let lastAgent = state.activeAgent;
 
+            // 先查找代码
             for (let t = targetTurn; t >= 0; t--) {
                 const selectedId = t === targetTurn ? messageId : state.selectedVersions[t];
                 const msg = allMsgs.find(m => m.id === selectedId);
@@ -326,26 +336,37 @@ export const useChatStore = create<ChatState>((set) => ({
                     const lastStep = [...msg.steps].reverse().find((s: any) => s.type === 'tool_end' && s.content);
                     if (lastStep && lastStep.content) {
                         lastCode = lastStep.content;
-                        if (msg.agent) lastAgent = msg.agent as AgentType;
                         break;
                     }
                 }
             }
+
+            // 再查找 agent（优先使用目标消息的 agent）
+            if (targetMsg.agent) {
+                lastAgent = targetMsg.agent as AgentType;
+            } else {
+                // 如果目标消息没有 agent，向前查找
+                for (let t = targetTurn; t >= 0; t--) {
+                    const selectedId = t === targetTurn ? messageId : state.selectedVersions[t];
+                    const msg = allMsgs.find(m => m.id === selectedId);
+                    if (msg && msg.role === 'assistant' && msg.agent) {
+                        lastAgent = msg.agent as AgentType;
+                        break;
+                    }
+                }
+            }
+
             return { currentCode: lastCode, activeAgent: lastAgent, activeMessageId: messageId, isStreamingCode: false };
         });
     },
 
     switchMessageVersion: (messageId: number) => {
-        console.log('🔄 switchMessageVersion called with messageId:', messageId);
-        console.log('📌 Current activeMessageId:', useChatStore.getState().activeMessageId);
         set((state) => {
             const allMsgs = state.allMessages;
             const targetMsg = allMsgs.find(m => m.id === messageId);
             if (!targetMsg) {
-                console.log('❌ Target message not found');
                 return {};
             }
-            console.log('📝 Target message:', targetMsg);
 
             const turnIndex = targetMsg.turn_index || 0;
             const newSelectedVersions = { ...state.selectedVersions, [turnIndex]: messageId };
@@ -373,29 +394,18 @@ export const useChatStore = create<ChatState>((set) => ({
             if (targetMsg.role === 'assistant') {
                 // 从目标消息的 steps 中提取代码
                 if (targetMsg.steps) {
-                    console.log('🔍 Target message has steps:', targetMsg.steps.length);
                     const lastStep = [...targetMsg.steps].reverse().find((s: any) => s.type === 'tool_end' && s.content);
                     if (lastStep && lastStep.content) {
                         lastCode = lastStep.content;
-                        console.log('✅ Found code, length:', lastCode.length);
                     } else {
-                        console.log('⚠️ No tool_end step with content found');
                     }
                 } else {
-                    console.log('⚠️ Target message has no steps');
                 }
                 // 使用目标消息的 agent
                 if (targetMsg.agent) {
                     lastAgent = targetMsg.agent as AgentType;
-                    console.log('✅ Using agent:', lastAgent);
                 }
             }
-
-            console.log('🎯 Final update:', {
-                currentCode: lastCode ? lastCode.substring(0, 50) + '...' : '(empty)',
-                activeAgent: lastAgent,
-                activeMessageId: messageId
-            });
 
             return {
                 messages: newMessages,

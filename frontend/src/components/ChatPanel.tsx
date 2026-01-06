@@ -754,7 +754,7 @@ export const ChatPanel = () => {
                                         pre: ({ node, ...props }) => <pre className="bg-slate-900 text-slate-50 p-3 rounded-lg overflow-x-auto text-xs my-2 max-w-full custom-scrollbar" {...props} />
                                     }}
                                 >
-                                    {msg.content}
+                                    {msg.content.split('\n').filter(line => !line.includes('[Error')).join('\n')}
                                 </ReactMarkdown>
                                 {isGenerating && (
                                     <div className={cn(

@@ -41,6 +41,14 @@ export const ChartsAgent = forwardRef<AgentRef>((_, ref) => {
         }
         if (isStreamingCode) return;
 
+        // 销毁已存在的实例
+        if (chartRef.current) {
+            const existingInstance = echarts.getInstanceByDom(chartRef.current);
+            if (existingInstance) {
+                existingInstance.dispose();
+            }
+        }
+
         const chart = echarts.init(chartRef.current);
         chartInstanceRef.current = chart;
 
@@ -129,14 +137,14 @@ export const ChartsAgent = forwardRef<AgentRef>((_, ref) => {
     }, [currentCode, isStreamingCode]);
 
     return (
-        <div className="w-full h-full relative bg-white">
+        <div className="w-full h-full relative bg-white flex items-center justify-center">
             {error ? (
-                <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-                    <div className="p-3 bg-red-50 rounded-full mb-3">
-                        <AlertCircle className="w-6 h-6 text-red-500" />
+                <div className="flex flex-col items-center justify-center p-8 text-center max-w-md">
+                    <div className="p-4 bg-red-50 rounded-full mb-4">
+                        <AlertCircle className="w-8 h-8 text-red-500" />
                     </div>
-                    <p className="text-sm font-semibold text-slate-800">Chart Render Failed</p>
-                    <p className="text-xs text-slate-500 mt-1 mb-4 max-w-xs">{error}</p>
+                    <p className="text-base font-semibold text-slate-800 mb-2">Chart Render Failed</p>
+                    <p className="text-sm text-slate-600 mb-6">{error}</p>
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('deepdiagram-retry', {
                             detail: {
@@ -144,7 +152,7 @@ export const ChartsAgent = forwardRef<AgentRef>((_, ref) => {
                                 error: error
                             }
                         }))}
-                        className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors"
+                        className="px-6 py-2.5 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors shadow-sm"
                     >
                         Try Regenerating
                     </button>
