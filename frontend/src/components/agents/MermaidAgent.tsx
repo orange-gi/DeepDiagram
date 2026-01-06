@@ -147,6 +147,11 @@ export const MermaidAgent = forwardRef<AgentRef>((_, ref) => {
     }));
 
     useEffect(() => {
+        console.log('🎨 MermaidAgent useEffect triggered:', {
+            currentCode: currentCode ? currentCode.substring(0, 50) + '...' : '(empty)',
+            isStreamingCode,
+            hasContainer: !!containerRef.current
+        });
         setIsLoaded(false);
         if (!currentCode) {
             setSvgContent('');
@@ -154,7 +159,12 @@ export const MermaidAgent = forwardRef<AgentRef>((_, ref) => {
             return;
         }
         const renderDiagram = async () => {
-            if (!containerRef.current || isStreamingCode) return;
+            if (!containerRef.current) {
+                console.log('⚠️ No container ref');
+                return;
+            }
+            // 移除 isStreamingCode 检查，总是渲染
+            console.log('✅ Starting Mermaid render...');
 
             try {
                 setError(null);
@@ -196,6 +206,7 @@ export const MermaidAgent = forwardRef<AgentRef>((_, ref) => {
                     }
                 }, 50);
 
+                console.log('✅ Mermaid render complete');
                 useChatStore.getState().reportSuccess();
             } catch (err) {
                 console.warn("Mermaid parsing/render error:", err);
@@ -207,7 +218,7 @@ export const MermaidAgent = forwardRef<AgentRef>((_, ref) => {
         };
 
         renderDiagram();
-    }, [currentCode, isStreamingCode]);
+    }, [currentCode]);
 
     useEffect(() => {
         if (!wrapperRef.current || !isLoaded || !dimensions) return;
@@ -236,7 +247,10 @@ export const MermaidAgent = forwardRef<AgentRef>((_, ref) => {
                     <p className="text-xs text-slate-500 mt-1 mb-4 max-w-xs">{error}</p>
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('deepdiagram-retry', {
-                            detail: { index: useChatStore.getState().messages.length - 1 }
+                            detail: {
+                                index: useChatStore.getState().messages.length - 1,
+                                error: error
+                            }
                         }))}
                         className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors"
                     >

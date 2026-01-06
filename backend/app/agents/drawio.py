@@ -27,6 +27,7 @@ Your goal is to interpret the user's request and generate a valid, uncompressed 
 -   Use standard `style` attributes for shapes (e.g., `style="rounded=1;whiteSpace=wrap;html=1;"` for rectangles).
 -   Use `style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;"` for connectors (edges).
 - **CONTENT RICHNESS**: If the user request is simple (e.g., "AWS Architecture"), expand it into a detailed, professional diagram including VPCs, Subnets, multiple availability zones, and common services (ELB, EC2, RDS, S3) arranged logically.
+- **LANGUAGE**: All text inside the diagram (values, labels, descriptions) MUST be in the same language as the user's input.
 
 ### Example Output format:
 <mxfile host="Electron" agent="DeepDiagram" version="24.0.0">
@@ -87,6 +88,18 @@ async def drawio_agent(state: AgentState):
     """
     messages = state.get("messages", [])
     current_code = state.get("current_code", "")
+    
+    # Sync current_code from last tool message if available
+    if messages and messages[-1].type == "tool":
+        last_tool_msg = messages[-1]
+        if last_tool_msg.content:
+             current_code = last_tool_msg.content.strip()
+
+    # Safety: Ensure no empty text content blocks reach the LLM
+    for msg in messages:
+        if hasattr(msg, 'content') and not msg.content:
+            msg.content = "Generate architecture diagram"
+
     set_context(messages, current_code=current_code)
     
     # Bind tool
@@ -96,10 +109,12 @@ async def drawio_agent(state: AgentState):
     system_prompt = SystemMessage(content="""You are an expert Draw.io Orchestrator.
     Your goal is to understand the user's request and call the `render_drawio_xml` tool with the appropriate instructions.
     
-    Interpret the user's intent to create or modify a complex diagram. 
-    Explain what you are going to draw, then call the tool.
+    ### PROACTIVENESS PRINCIPLES:
+    1. **BE DECISIVE**: If the user wants a complex diagram (e.g., "AWS Architecture"), call the tool IMMEDIATELY.
+    2. **ARCHITECT SYSTEMS**: If the architecture is not specified, design a production-ready system architecture yourself.
+    3. **AVOID HESITATION**: DO NOT ask for components or connections. Just build a high-fidelity diagram.
     """)
     
     response = await llm_with_tools.ainvoke([system_prompt] + messages)
     
-    return {"messages": [response]}
+    return {"messages": [response], "current_code": current_code}

@@ -77,8 +77,13 @@ export const ChatPanel = () => {
         selectSession,
         createNewChat,
         deleteSession,
-        switchMessageVersion
+        switchMessageVersion,
+        syncCodeToMessage,
+        activeMessageId,
+        setActiveMessageId
     } = useChatStore();
+
+    const isPagingRef = useRef(false);
 
     // Auto-clear toast
     useEffect(() => {
@@ -117,46 +122,43 @@ export const ChatPanel = () => {
         }
     };
 
-    const handleRetry = (index: number) => {
+    const handleRetry = (index: number, errorMessage?: string) => {
         if (isLoading) return;
         const msgs = [...messages];
         let retryPrompt = '';
         let retryImages: string[] = [];
         let parentId: number | null | undefined = undefined;
-        let sliceIndex = 0;
 
         if (msgs[index].role === 'user') {
             retryPrompt = msgs[index].content;
             retryImages = msgs[index].images || [];
             parentId = msgs[index].parent_id ?? null;
-            sliceIndex = index + 1; // Branch from this user message
         } else {
             for (let i = index - 1; i >= 0; i--) {
                 if (msgs[i].role === 'user') {
                     retryPrompt = msgs[i].content;
                     retryImages = msgs[i].images || [];
                     parentId = msgs[i].id ?? null; // Ensure we don't pass undefined
-                    sliceIndex = i + 1; // Branch from this user message
                     break;
                 }
             }
         }
         if (retryPrompt || retryImages.length > 0) {
-            // Slice the visual list to the branching point before triggering new generation
-            useChatStore.setState({ messages: msgs.slice(0, sliceIndex) });
-            // If we are retrying a USER message, we want to create a NEW USER message (isRetry=false)
-            // If we are retrying an ASSISTANT message, we want to create a NEW ASSISTANT message (isRetry=true)
+            // We don't slice history anymore to support linear versioning
+            // The logic will be handled by Turn Index and Version switching
             const isAssistantRetry = msgs[index].role === 'assistant';
-            void triggerSubmit(retryPrompt, retryImages, parentId, isAssistantRetry);
+            void triggerSubmit(retryPrompt, retryImages, parentId, isAssistantRetry, errorMessage);
         }
     };
 
     // Listen for cross-component retry requests (e.g. from Canvas)
     useEffect(() => {
         const handler = (e: Event) => {
-            const index = (e as CustomEvent).detail?.index;
+            const detail = (e as CustomEvent).detail;
+            const index = detail?.index;
+            const error = detail?.error;
             if (typeof index === 'number') {
-                handleRetry(index);
+                handleRetry(index, error);
             }
         };
         window.addEventListener('deepdiagram-retry', handler);
@@ -221,8 +223,16 @@ export const ChatPanel = () => {
     };
 
     useEffect(() => {
+        if (isPagingRef.current) {
+            isPagingRef.current = false;
+            return;
+        }
         scrollToBottom();
     }, [messages]);
+
+    const handleSync = (msg: Message) => {
+        // 点击消息卡片不再触发渲染，只有点击 Render 按钮才渲染
+    };
 
     useEffect(() => {
         if (inputRef.current) {
@@ -303,9 +313,13 @@ export const ChatPanel = () => {
         }
     };
 
-    const triggerSubmit = async (customPrompt?: string, customImages?: string[], parentId?: number | null, isRetry?: boolean) => {
-        const promptToUse = customPrompt ?? input;
+    const triggerSubmit = async (customPrompt?: string, customImages?: string[], parentId?: number | null, isRetry?: boolean, errorMessage?: string) => {
+        let promptToUse = customPrompt ?? input;
         const imagesToUse = customImages ?? [...inputImages];
+
+        if (errorMessage) {
+            promptToUse += `\n\n[System Note: The previous diagram generation failed to render with the following error. Please fix the syntax: ${errorMessage}]`;
+        }
 
         if ((!promptToUse.trim() && imagesToUse.length === 0) || isLoading) return;
 
@@ -318,17 +332,28 @@ export const ChatPanel = () => {
         setStreamingCode(false); // Reset streaming state
 
         const currentMessages = useChatStore.getState().messages;
+        const allMessages = useChatStore.getState().allMessages;
         const effectiveParentId = parentId ?? (currentMessages.length > 0 ? currentMessages[currentMessages.length - 1].id : null);
 
+        // Calculate Turn Index
+        let parentTurn = -1;
+        if (effectiveParentId) {
+            const pm = allMessages.find(m => m.id === effectiveParentId);
+            if (pm) parentTurn = pm.turn_index ?? -1;
+        }
+
         if (!isRetry) {
-            // New turn: Assistant is child of the User message
-            addMessage({ role: 'user', content: promptToUse, images: imagesToUse, parent_id: effectiveParentId ?? null });
+            const userTurn = parentTurn + 1;
+            const assistantTurn = userTurn + 1;
+            addMessage({ role: 'user', content: promptToUse, images: imagesToUse, parent_id: effectiveParentId ?? null, turn_index: userTurn });
             setLoading(true);
-            addMessage({ role: 'assistant', content: '', parent_id: undefined }); // Linked by unconfirmed ID propagation
+            addMessage({ role: 'assistant', content: '', parent_id: undefined, turn_index: assistantTurn });
+            setActiveMessageId(null); // Will fallback to last message in allMessages until ID is confirmed
         } else {
-            // Retry: Assistant shares parent with the retried message (siblings)
+            const assistantTurn = parentTurn + 1;
             setLoading(true);
-            addMessage({ role: 'assistant', content: '', parent_id: parentId ?? null });
+            addMessage({ role: 'assistant', content: '', parent_id: parentId ?? null, turn_index: assistantTurn });
+            setActiveMessageId(null);
         }
 
         let thoughtBuffer = "";
@@ -380,53 +405,61 @@ export const ChatPanel = () => {
                                 setSessionId(data.session_id);
                                 void loadSessions(); // Refresh list when new session is created
                             } else if (eventName === 'message_created') {
-                                // Update the ID of the last user or assistant message
+                                // Update the ID and Turn Index of the unconfirmed message
                                 useChatStore.setState((state) => {
-                                    const msgs = [...state.messages];
                                     const allMsgs = [...state.allMessages];
 
-                                    // Find the last message that matches the role and update its ID
-                                    const lastMatchIdx = [...msgs].reverse().findIndex(m => m.role === data.role);
-                                    if (lastMatchIdx !== -1) {
-                                        const actualIdx = msgs.length - 1 - lastMatchIdx;
-                                        const oldId = msgs[actualIdx].id;
-                                        msgs[actualIdx].id = data.id;
-
-                                        // Also update in allMessages - find the matching message object by role and missing ID
-                                        const lastAllMatchIdx = [...allMsgs].reverse().findIndex(m => m.role === data.role && !m.id);
-                                        if (lastAllMatchIdx !== -1) {
-                                            allMsgs[allMsgs.length - 1 - lastAllMatchIdx].id = data.id;
+                                    // Find the first message of this role that doesn't have an ID yet
+                                    const targetIdx = allMsgs.findIndex(m => m.role === data.role && !m.id);
+                                    if (targetIdx !== -1) {
+                                        const oldId = allMsgs[targetIdx].id;
+                                        allMsgs[targetIdx].id = data.id;
+                                        if (data.turn_index !== undefined) {
+                                            allMsgs[targetIdx].turn_index = data.turn_index;
                                         }
 
-                                        // FIX: Propagate the true ID to any children that were referencing the unconfirmed message
-                                        // This is critical for the paging UI to recognize siblings immediately
+                                        // Propagate ID to any children (though with linear turns this is less critical)
                                         allMsgs.forEach(m => {
-                                            if (m.parent_id === oldId) {
-                                                m.parent_id = data.id;
-                                            }
-                                        });
-                                        msgs.forEach(m => {
-                                            if (m.parent_id === oldId) {
+                                            if (m.parent_id === oldId && oldId !== undefined) {
                                                 m.parent_id = data.id;
                                             }
                                         });
 
-                                        // Update selectedVersions for the parent to track this new active message
-                                        // Only update for assistant messages, user messages don't have versions
-                                        const pid = msgs[actualIdx].parent_id;
-                                        if (pid !== null && pid !== undefined && data.role !== 'user') {
-                                            return {
-                                                messages: msgs,
-                                                allMessages: allMsgs,
-                                                selectedVersions: {
-                                                    ...state.selectedVersions,
-                                                    [pid]: data.id
-                                                }
-                                            };
+                                        // Update activeMessageId if it's the assistant
+                                        let activeId = state.activeMessageId;
+                                        if (data.role === 'assistant') {
+                                            activeId = data.id;
                                         }
-                                    }
 
-                                    return { messages: msgs, allMessages: allMsgs };
+                                        // Update selected version for this turn
+                                        const turn = allMsgs[targetIdx].turn_index ?? 0;
+                                        const newSelectedVersions = { ...state.selectedVersions, [turn]: data.id };
+
+                                        // Rebuild messages list
+                                        const turnMap: Record<number, Message[]> = {};
+                                        allMsgs.forEach(m => {
+                                            const t = m.turn_index || 0;
+                                            if (!turnMap[t]) turnMap[t] = [];
+                                            turnMap[t].push(m);
+                                        });
+
+                                        const sortedTurns = Object.keys(turnMap).map(Number).sort((a, b) => a - b);
+                                        const newMessages: Message[] = [];
+                                        sortedTurns.forEach(t => {
+                                            const siblings = turnMap[t];
+                                            const selectedId = newSelectedVersions[t];
+                                            const selected = siblings.find(s => s.id === selectedId) || siblings[siblings.length - 1];
+                                            newMessages.push(selected);
+                                        });
+
+                                        return {
+                                            allMessages: allMsgs,
+                                            messages: newMessages,
+                                            selectedVersions: newSelectedVersions,
+                                            activeMessageId: activeId
+                                        };
+                                    }
+                                    return {};
                                 });
                             } else if (eventName === 'agent_selected') {
                                 setAgent(data.agent);
@@ -483,13 +516,21 @@ export const ChatPanel = () => {
                                                 .replace(/\\n/g, '\n')
                                                 .replace(/\\"/g, '"')
                                                 .replace(/\\\\/g, '\\');
-                                            setCurrentCode(partialContent);
+
+                                            // Only live-stream mindmaps as they handle partial markdown well.
+                                            // Others (Mermaid, Charts, Flow, Drawio) crash on partial syntax.
+                                            if (useChatStore.getState().activeAgent === 'mindmap') {
+                                                setCurrentCode(partialContent);
+                                            }
                                         } else {
                                             let partialContent = toolArgsBuffer.substring(startIdx)
                                                 .replace(/\\n/g, '\n')
                                                 .replace(/\\"/g, '"')
                                                 .replace(/\\\\/g, '\\');
-                                            setCurrentCode(partialContent);
+
+                                            if (useChatStore.getState().activeAgent === 'mindmap') {
+                                                setCurrentCode(partialContent);
+                                            }
                                         }
                                     }
                                 }
@@ -499,6 +540,11 @@ export const ChatPanel = () => {
                                 updateLastStepContent('', false, 'done');
                                 if (data.output) {
                                     setCurrentCode(data.output);
+                                }
+                            } else if (eventName === 'code_update') {
+                                // Explicit trigger for final diagram rendering
+                                if (data.content) {
+                                    setCurrentCode(data.content);
                                 }
                             }
                         } catch (jsonErr) {
@@ -650,26 +696,34 @@ export const ChatPanel = () => {
                 {messages.map((msg, idx) => {
                     const switchVersion = (msg: Message, delta: number) => {
                         if (isLoading) return; // Prevent switching while loading
-                        const siblings = allMessages.filter(m => m.parent_id === msg.parent_id && m.role === msg.role);
+                        const turnIndex = msg.turn_index || 0;
+                        const siblings = allMessages.filter(m => (m.turn_index || 0) === turnIndex && m.role === msg.role);
                         if (siblings.length <= 1) return;
 
                         const currentIdx = siblings.findIndex(s => s.id === msg.id);
-                        if (currentIdx === -1) return; // Should not happen if data is consistent
+                        if (currentIdx === -1) return;
 
                         const nextIdx = (currentIdx + delta + siblings.length) % siblings.length;
                         const targetId = siblings[nextIdx].id;
-                        if (targetId) switchMessageVersion(targetId);
+                        if (targetId) {
+                            isPagingRef.current = true;
+                            switchMessageVersion(targetId);
+                        }
                     };
 
                     const getVersionInfo = (msg: Message) => {
-                        const siblings = allMessages.filter(m => m.parent_id === msg.parent_id && m.role === msg.role);
+                        const turnIndex = msg.turn_index || 0;
+                        const siblings = allMessages.filter(m => (m.turn_index || 0) === turnIndex && m.role === msg.role);
                         if (siblings.length <= 1) return null;
                         const currentIdx = siblings.findIndex(s => s.id === msg.id);
                         return { current: currentIdx + 1, total: siblings.length };
                     };
 
                     const versionInfo = msg.role === 'assistant' ? getVersionInfo(msg) : null;
-                    const isGenerating = msg.role === 'assistant' && idx === messages.length - 1 && isLoading;
+                    const isGenerating = msg.role === 'assistant' && isLoading && (
+                        (activeMessageId !== null && msg.id === activeMessageId) ||
+                        (activeMessageId === null && !msg.id && idx === messages.findIndex(m => !m.id))
+                    );
                     const hasVisibleSteps = msg.steps && msg.steps.some(s => !(s.type === 'agent_select' && (s.name === 'general' || s.name === 'general_agent')));
                     const hasContent = msg.content.trim() || hasVisibleSteps || (msg.images && msg.images.length > 0);
 
@@ -678,19 +732,17 @@ export const ChatPanel = () => {
                     }
 
                     return (
-                        <div
-                            key={idx}
-                            className={cn(
-                                "flex flex-col w-full animate-in fade-in slide-in-from-bottom-2 duration-300 group",
-                                msg.role === 'user' ? "items-end" : "items-start"
-                            )}
-                        >
+                        <div key={msg.id || idx} className={cn(
+                            "flex flex-col group",
+                            msg.role === 'user' ? "items-end" : "items-start"
+                        )}>
                             <div
+                                onClick={() => handleSync(msg)}
                                 className={cn(
-                                    "max-w-[85%] rounded-2xl px-5 py-3 text-sm leading-relaxed shadow-sm",
+                                    "max-w-[85%] rounded-2xl p-4 shadow-sm relative transition-all duration-300",
                                     msg.role === 'user'
-                                        ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-tr-sm"
-                                        : "bg-white border border-slate-100 text-slate-800 rounded-tl-sm"
+                                        ? "bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-tr-none"
+                                        : "bg-white text-slate-800 rounded-tl-none border border-slate-100/50 hover:shadow-md hover:border-blue-100/50"
                                 )}
                             >
                                 {msg.steps && msg.steps.length > 0 && (

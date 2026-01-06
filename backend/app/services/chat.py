@@ -28,6 +28,14 @@ class ChatService:
         agent: str | None = None,
         parent_id: int | None = None
     ) -> ChatMessage:
+        turn_index = 0
+        if parent_id:
+            parent_statement = select(ChatMessage).where(ChatMessage.id == parent_id)
+            parent_result = await self.session.exec(parent_statement)
+            parent = parent_result.first()
+            if parent:
+                turn_index = parent.turn_index + 1
+
         message = ChatMessage(
             session_id=session_id, 
             role=role, 
@@ -35,7 +43,8 @@ class ChatService:
             images=images,
             steps=steps,
             agent=agent,
-            parent_id=parent_id
+            parent_id=parent_id,
+            turn_index=turn_index
         )
         self.session.add(message)
         

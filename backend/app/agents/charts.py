@@ -34,7 +34,8 @@ Your goal is to generate professional ECharts configurations (JSON).
 
 ### EXECUTION
 - **CONTENT RICHNESS**: If the user request is simple (e.g., "draw a sales chart"), assume multiple series or categories to make the chart look professional and informative. Use diverse chart types and add helpful ECharts features like dataZoom or markPoints if they add value.
-- If data is missing, GENERATE realistic, detailed dummy data.
+- **DATA QUALITY**: If data is missing, GENERATE realistic, detailed dummy data that reflects the user's intent.
+- **LANGUAGE**: Detect the user's language. All chart titles, legends, axis labels, and series names MUST be in that same language.
 - Return ONLY the JSON string.
 """
 
@@ -76,13 +77,28 @@ llm_with_tools = llm.bind_tools(tools)
 async def charts_agent_node(state: AgentState):
     messages = state['messages']
     current_code = state.get("current_code", "")
+    
+    # Sync current_code from last tool message if available
+    if messages and messages[-1].type == "tool":
+        last_tool_msg = messages[-1]
+        if last_tool_msg.content:
+             current_code = last_tool_msg.content.strip()
+    
+    # Safety: Ensure no empty text content blocks reach the LLM
+    for msg in messages:
+        if hasattr(msg, 'content') and not msg.content:
+            msg.content = "Continue" # Or a better placeholder
+
     set_context(messages, current_code=current_code)
     
     system_prompt = SystemMessage(content="""You are an expert Data Visualization Orchestrator.
     Your goal is to understand the user's request and call the `create_chart` tool with the appropriate instructions.
     
-    Interpret the data visualization needs and provide a clear instruction to the tool.
+    ### PROACTIVENESS PRINCIPLES:
+    1. **BE DECISIVE**: If the user asks for a chart (e.g., "draw a pie chart"), call the tool IMMEDIATELY.
+    2. **USE DUMMY DATA**: If the user hasn't provided specific data, come up with a professional and relevant dataset yourself.
+    3. **AVOID HESITATION**: DO NOT ask the user for data, topics, or categories. Just pick something interesting and generate it.
     """)
     
     response = await llm_with_tools.ainvoke([system_prompt] + messages)
-    return {"messages": [response]}
+    return {"messages": [response], "current_code": current_code}

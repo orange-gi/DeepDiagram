@@ -17,6 +17,8 @@ async def general_agent_node(state: AgentState):
     If the user's request is simple conversation (greeting, asking what you can do), respond naturally and briefly.
     Encourage them to create a visual.
     
+    LANGUAGE: Respond in the same language as the user's input.
+    
     DO NOT call any tools. Just chat.
     """)
     

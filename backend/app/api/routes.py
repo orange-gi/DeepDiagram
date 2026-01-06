@@ -9,7 +9,7 @@ from app.services.chat import ChatService
 import json
 from typing import AsyncGenerator
 from app.core.logger import logger
-from datetime import datetime
+from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -33,7 +33,11 @@ async def event_generator(request: ChatRequest, db: AsyncSession) -> AsyncGenera
         session_id = chat_session.id
         yield f"event: session_created\ndata: {json.dumps({'session_id': session_id})}\n\n"
     
-    # 2. Manage User Message
+    # 2. Load History for context reconstruction
+    all_history = await chat_service.get_history(session_id)
+    history_map = {msg.id: msg for msg in all_history}
+
+    # 3. Manage User Message
     last_user_msg_id = None
     if request.is_retry and request.parent_id:
         # If retrying, the parent_id IS the user message we are retrying
@@ -47,38 +51,80 @@ async def event_generator(request: ChatRequest, db: AsyncSession) -> AsyncGenera
         )
         last_user_msg_id = user_msg.id
     
-    yield f"event: message_created\ndata: {json.dumps({'id': last_user_msg_id, 'role': 'user'})}\n\n"
+    yield f"event: message_created\ndata: {json.dumps({'id': last_user_msg_id, 'role': 'user', 'turn_index': (user_msg.turn_index if not request.is_retry else history_map[last_user_msg_id].turn_index) if last_user_msg_id in history_map or not request.is_retry else 0})}\n\n"
     
-    # 3. Load History
-    all_history = await chat_service.get_history(session_id)
-    
-    # Trace the branch from request.parent_id backwards to root
-    # This ensures that for retries or switching versions, the LLM only sees the active branch
-    history_map = {msg.id: msg for msg in all_history}
-    
-    branch_messages = []
-    curr_id = request.parent_id
-    
-    # If it's a retry, the parent_id provided is the User Message itself.
-    # We want its ancestors for the history.
-    if request.is_retry and curr_id in history_map:
-        curr_id = history_map[curr_id].parent_id
+    # Group messages by turn_index and pick the latest of each
+    turn_to_latest = {}
+    for msg in all_history:
+        t = msg.turn_index or 0
+        if t not in turn_to_latest or msg.id > turn_to_latest[t].id:
+            turn_to_latest[t] = msg
 
-    while curr_id is not None and curr_id in history_map:
-        msg = history_map[curr_id]
-        branch_messages.append(msg)
-        curr_id = msg.parent_id
+    # Identify the relevant turn range
+    import time
+    start_time = time.time()
     
-    branch_messages.reverse()
+    max_turn = -1
+    if request.parent_id and (request.parent_id in history_map):
+        max_turn = history_map[request.parent_id].turn_index
+        if request.is_retry:
+            max_turn -= 1
+
+    branch_messages = []
+    for t in range(max_turn + 1):
+        if t in turn_to_latest:
+            branch_messages.append(turn_to_latest[t])
+    
+    logger.info(f"⏱️ History assembly took {(time.time() - start_time) * 1000:.2f}ms, {len(branch_messages)} messages")
     
     from langchain_core.messages import AIMessage, HumanMessage
 
     formatted_history = []
     for msg in branch_messages:
         if msg.role == "user":
-            formatted_history.append(HumanMessage(content=msg.content))
+            if msg.images:
+                human_content = [{"type": "text", "text": msg.content}]
+                for img_url in msg.images:
+                    human_content.append({"type": "image_url", "image_url": {"url": img_url}})
+                formatted_history.append(HumanMessage(content=human_content))
+            else:
+                formatted_history.append(HumanMessage(content=msg.content))
         elif msg.role == "assistant":
-            formatted_history.append(AIMessage(content=msg.content))
+            # Augment assistant message with tool inputs/outputs for better context
+            content = msg.content or ""
+            if msg.steps:
+                execution_details = []
+                last_tool_desc = ""
+                agent_name = msg.agent or "general"
+                
+                # Format steps following user suggestion
+                for s in msg.steps:
+                    if s["type"] == "agent_select":
+                        details_line = f"agentName: {s['name']}"
+                        execution_details.append(details_line)
+                    elif s["type"] == "tool_start":
+                        last_tool_desc = f"toolName: {s['name']}, toolArgs: {s.get('content', '')}"
+                    elif s["type"] == "tool_end" and last_tool_desc:
+                        output = s.get('content', '')
+                        # Combine start and end into a single execution line
+                        execution_details.append(f"{last_tool_desc}, toolsOutput: {output}")
+                        last_tool_desc = ""
+                    elif s["type"] == "tool_end":
+                         # Fallback if no tool_start found
+                         output = s.get('content', '')
+                         execution_details.append(f"toolName: {s['name']}, toolsOutput: {output}")
+                
+                if last_tool_desc:
+                    execution_details.append(last_tool_desc)
+                
+                if execution_details:
+                    trace_block = "### Execution Trace:\n" + "\n".join(execution_details)
+                    if content:
+                        content = f"{content}\n\n{trace_block}"
+                    else:
+                        content = trace_block
+            
+            formatted_history.append(AIMessage(content=content))
             
     # Current Message Construction (same as before)
     if request.images:
@@ -95,15 +141,20 @@ async def event_generator(request: ChatRequest, db: AsyncSession) -> AsyncGenera
     # Combine
     full_messages = formatted_history + [message]
 
+    # Combined state for persistence
+    current_active_code = request.context.get("current_code", "")
+
     inputs = {
         "messages": full_messages,
-        "current_code": request.context.get("current_code", ""),
+        "current_code": current_active_code,
     }
     
     full_response_content = ""
     accumulated_steps = []
     selected_agent = None
-
+    
+    logger.info(f"🚀 Starting LLM stream with {len(full_messages)} messages, is_retry={request.is_retry}")
+    
     try:
         # Stateless execution: No thread_id, so it runs fresh with provided history
         async for event in graph.astream_events(inputs, version="v1"):
@@ -157,11 +208,17 @@ async def event_generator(request: ChatRequest, db: AsyncSession) -> AsyncGenera
                                 yield f"event: tool_args_stream\ndata: {json.dumps({'args': args_chunk})}\n\n"
 
             elif event_type == "on_tool_start":
+                # Filter out internal LangChain/OpenAI calls that are mistakenly reported as tools in v1
+                if event["name"] == "ChatOpenAI":
+                    continue
+                    
                 # Add tool start step
+                tool_input = json.dumps(data.get("input"))
+                
                 step = {
                     "type": "tool_start",
                     "name": event["name"],
-                    "content": json.dumps(data.get("input")),
+                    "content": tool_input,
                     "status": "running",
                     "timestamp": int(datetime.utcnow().timestamp() * 1000)
                 }
@@ -179,7 +236,7 @@ async def event_generator(request: ChatRequest, db: AsyncSession) -> AsyncGenera
                 if accumulated_steps:
                     accumulated_steps.append({
                         "type": "tool_end",
-                        "name": "Result",
+                        "name": event["name"],  # Use actual tool name instead of generic "Result"
                         "content": output if isinstance(output, str) else json.dumps(output),
                         "status": "done",
                         "timestamp": int(datetime.utcnow().timestamp() * 1000)
@@ -188,6 +245,19 @@ async def event_generator(request: ChatRequest, db: AsyncSession) -> AsyncGenera
                         if s["type"] == "tool_start" and s["status"] == "running":
                             s["status"] = "done"
                             break
+
+                # Identify if this tool output should update the current code
+                # (Simple check: if it looks like JSON or Mermaid or XML)
+                potential_code = output if isinstance(output, str) else json.dumps(output)
+                stripped = potential_code.strip()
+                if (stripped.startswith("{") and stripped.endswith("}")) or \
+                   (stripped.startswith("[") and stripped.endswith("]")) or \
+                   stripped.startswith("graph") or \
+                   stripped.startswith("sequenceDiagram") or \
+                   stripped.startswith("<mxfile") or \
+                   stripped.startswith("#"): # Mindmap
+                    current_active_code = potential_code
+                    yield f"event: code_update\ndata: {json.dumps({'content': potential_code})}\n\n"
 
                 yield f"event: tool_end\ndata: {json.dumps({'output': output})}\n\n"
         
@@ -200,7 +270,15 @@ async def event_generator(request: ChatRequest, db: AsyncSession) -> AsyncGenera
                 agent=selected_agent,
                 parent_id=last_user_msg_id
             )
-            yield f"event: message_created\ndata: {json.dumps({'id': assistant_msg.id, 'role': 'assistant'})}\n\n"
+            yield f"event: message_created\ndata: {json.dumps({'id': assistant_msg.id, 'role': 'assistant', 'turn_index': assistant_msg.turn_index})}\n\n"
+            
+            # 5. Persist Current Code to Session
+            if current_active_code:
+                session = await chat_service.get_session(session_id)
+                if session:
+                    session.current_code = current_active_code
+                    session.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                    await chat_service.session.commit()
             
     except Exception as e:
         import traceback
@@ -223,7 +301,13 @@ async def list_sessions(db: AsyncSession = Depends(get_session)):
 async def get_session_history(session_id: int, db: AsyncSession = Depends(get_session)):
     chat_service = ChatService(db)
     history = await chat_service.get_history(session_id)
-    return history
+    session = await chat_service.get_session(session_id)
+    
+    return {
+        "messages": history,
+        "current_code": session.current_code if session else None,
+        "session": session
+    }
 
 @router.delete("/sessions/{session_id}")
 async def delete_session(session_id: int, db: AsyncSession = Depends(get_session)):

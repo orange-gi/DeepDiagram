@@ -20,7 +20,9 @@ Your goal is to generate high-end, professional flowcharts in JSON format for Re
 1. **CONTENT RICHNESS**: If the user request is simple (e.g., "login flow"), expand it into a professional, production-ready diagram. Include edge cases (e.g., "Forgot Password", "Invalid Credentials", "MFA"), loading states, and redirect logic.
 2. **NO MANUAL STYLING**: NEVER include "style", "className", or "transform" in the JSON. The system handles all appearance natively.
 3. **NO ROTATION**: NEVER rotate nodes. The "decision" diamond is handled by the system geometry.
-4. **Clarity**: Keep labels concise and professional.
+4. **COMPLETENESS**: Include all necessary states, conditions, and loops.
+5. **LANGUAGE**: All node labels, process steps, and decision texts MUST be in the same language as the user's input message.
+6. **Clarity**: Keep labels concise and professional.
 
 ### LAYOUT & GRID
 Nodes MUST be placed on a clean grid.
@@ -79,13 +81,28 @@ llm_with_tools = llm.bind_tools(tools)
 async def flow_agent_node(state: AgentState):
     messages = state['messages']
     current_code = state.get("current_code", "")
+    
+    # Sync current_code from last tool message if available
+    if messages and messages[-1].type == "tool":
+        last_tool_msg = messages[-1]
+        if last_tool_msg.content:
+             current_code = last_tool_msg.content.strip()
+
+    # Safety: Ensure no empty text content blocks reach the LLM
+    for msg in messages:
+        if hasattr(msg, 'content') and not msg.content:
+            msg.content = "Generate a flowchart"
+
     set_context(messages, current_code=current_code)
     
     system_prompt = SystemMessage(content="""You are an expert Flowchart Orchestrator.
     Your goal is to understand the user's request and call the `create_flow` tool with the appropriate instructions.
     
-    Interpret the flowchart requirements and provide a clear instruction to the tool.
+    ### PROACTIVENESS PRINCIPLES:
+    1. **BE DECISIVE**: If the user asks for a flowchart (e.g., "login flow"), call the tool IMMEDIATELY.
+    2. **EXPAND REQUIREMENTS**: If details are missing, invent a professional and complete business process yourself.
+    3. **AVOID HESITATION**: DO NOT ask for steps or conditions. Just build a comprehensive flowchart based on the topic.
     """)
     
     response = await llm_with_tools.ainvoke([system_prompt] + messages)
-    return {"messages": [response]}
+    return {"messages": [response], "current_code": current_code}

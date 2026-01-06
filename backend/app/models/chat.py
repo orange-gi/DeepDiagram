@@ -14,6 +14,7 @@ class ChatSession(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
     
     messages: List["ChatMessage"] = Relationship(back_populates="session")
+    current_code: Optional[str] = Field(default=None)
 
     @field_serializer("created_at", "updated_at")
     def serialize_dt(self, dt: datetime, _info):
@@ -30,6 +31,7 @@ class ChatMessage(SQLModel, table=True):
     images: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     steps: Optional[List[Any]] = Field(default=None, sa_column=Column(JSON))
     agent: Optional[str] = Field(default=None)
+    turn_index: int = Field(default=0)
     created_at: datetime = Field(default_factory=utc_now)
     
     session: Optional[ChatSession] = Relationship(back_populates="messages")

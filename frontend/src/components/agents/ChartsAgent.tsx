@@ -139,7 +139,10 @@ export const ChartsAgent = forwardRef<AgentRef>((_, ref) => {
                     <p className="text-xs text-slate-500 mt-1 mb-4 max-w-xs">{error}</p>
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('deepdiagram-retry', {
-                            detail: { index: useChatStore.getState().messages.length - 1 }
+                            detail: {
+                                index: useChatStore.getState().messages.length - 1,
+                                error: error
+                            }
                         }))}
                         className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors"
                     >

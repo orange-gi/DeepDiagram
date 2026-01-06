@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useChatStore } from '../store/chatStore';
 import { cn } from '../lib/utils';
 import { Download, RotateCcw, RefreshCw } from 'lucide-react';
@@ -10,9 +10,42 @@ import { MermaidAgent } from './agents/MermaidAgent';
 import type { AgentRef } from './agents/types';
 
 export const CanvasPanel = () => {
-    const { activeAgent, currentCode, isLoading } = useChatStore();
+    const activeAgent = useChatStore(state => state.activeAgent);
+    const currentCode = useChatStore(state => state.currentCode);
+    const isLoading = useChatStore(state => state.isLoading);
+    const activeMessageId = useChatStore(state => state.activeMessageId);
+    const allMessages = useChatStore(state => state.allMessages);
     const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+    const [renderKey, setRenderKey] = useState(0);
     const agentRef = useRef<AgentRef>(null);
+
+    // 当 activeMessageId 或 currentCode 变化时，强制重新挂载组件
+    useEffect(() => {
+        setRenderKey(prev => prev + 1);
+        console.log('🔄 Forcing re-mount due to state change:', {
+            activeMessageId,
+            currentCode: currentCode.substring(0, 50) + '...'
+        });
+    }, [activeMessageId, currentCode]);
+
+    // 计算当前消息的版本号
+    const getCurrentVersionIndex = () => {
+        if (!activeMessageId) return 0;
+        const activeMsg = allMessages.find(m => m.id === activeMessageId);
+        if (!activeMsg) return 0;
+        const turnIndex = activeMsg.turn_index || 0;
+        const siblings = allMessages.filter(m => (m.turn_index || 0) === turnIndex && m.role === activeMsg.role);
+        const currentIdx = siblings.findIndex(s => s.id === activeMessageId);
+        return currentIdx >= 0 ? currentIdx : 0;
+    };
+
+    const versionIndex = getCurrentVersionIndex();
+    console.log('🔑 CanvasPanel key components:', {
+        activeMessageId,
+        versionIndex,
+        renderKey,
+        key: `mermaid-${renderKey}`
+    });
 
     const handleDownload = async (type: 'png' | 'svg') => {
         if (agentRef.current) {
@@ -96,11 +129,11 @@ export const CanvasPanel = () => {
                     </div>
 
                     <div className="w-full h-full">
-                        {activeAgent === 'flowchart' && <FlowAgent ref={agentRef} />}
-                        {activeAgent === 'mindmap' && <MindmapAgent ref={agentRef} />}
-                        {activeAgent === 'charts' && <ChartsAgent ref={agentRef} />}
-                        {activeAgent === 'drawio' && <DrawioAgent ref={agentRef} />}
-                        {activeAgent === 'mermaid' && <MermaidAgent ref={agentRef} />}
+                        {activeAgent === 'flowchart' && <FlowAgent key={`flow-${renderKey}`} ref={agentRef} />}
+                        {activeAgent === 'mindmap' && <MindmapAgent key={`mindmap-${renderKey}`} ref={agentRef} />}
+                        {activeAgent === 'charts' && <ChartsAgent key={`charts-${renderKey}`} ref={agentRef} />}
+                        {activeAgent === 'drawio' && <DrawioAgent key={`drawio-${renderKey}`} ref={agentRef} />}
+                        {activeAgent === 'mermaid' && <MermaidAgent key={`mermaid-${renderKey}`} ref={agentRef} />}
 
                         {!currentCode && (
                             <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">

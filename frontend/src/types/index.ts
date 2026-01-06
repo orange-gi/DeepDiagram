@@ -19,6 +19,7 @@ export interface Message {
     images?: string[];
     steps?: Step[]; // Execution trace
     agent?: AgentType | string;
+    turn_index?: number;
     created_at?: string;
 }
 
@@ -45,7 +46,8 @@ export interface ChatState {
     allMessages: Message[];
     inputImages: string[]; // Base64 data URLs
     isStreamingCode: boolean;
-    selectedVersions: Record<number, number>; // parentId -> selected messageId
+    activeMessageId: number | null;
+    selectedVersions: Record<number, number>; // turnIndex -> selected messageId
 
     setInput: (input: string) => void;
     setAgent: (agent: AgentType) => void;
@@ -56,17 +58,19 @@ export interface ChatState {
     setSessionId: (id: number | null) => void;
     setMessages: (messages: Message[]) => void;
     updateLastMessage: (content: string) => void;
+    setActiveMessageId: (id: number | null) => void;
+    addStepToLastMessage: (step: Step) => void;
+    updateLastStepContent: (content: string, isStreaming?: boolean, status?: 'running' | 'done', type?: Step['type'], append?: boolean) => void;
+    activeStepRef: { messageIndex: number, stepIndex: number } | null;
+    setActiveStepRef: (ref: { messageIndex: number, stepIndex: number } | null) => void;
+
     setInputImages: (images: string[]) => void;
     addInputImage: (image: string) => void;
     clearInputImages: () => void;
-    addStepToLastMessage: (step: import('../types').Step) => void;
-    markLastStepAsError: (error: string) => void;
-    activeStepRef: { messageIndex: number; stepIndex: number } | null;
-    setActiveStepRef: (ref: { messageIndex: number; stepIndex: number } | null) => void;
+
     reportError: (error: string) => void;
     reportSuccess: () => void;
     toast: { message: string; type: 'error' | 'success' } | null;
-    updateLastStepContent: (content: string, isStreaming?: boolean, status?: 'running' | 'done') => void;
     clearToast: () => void;
 
     // Session management
@@ -75,4 +79,5 @@ export interface ChatState {
     createNewChat: () => void;
     deleteSession: (sessionId: number) => Promise<void>;
     switchMessageVersion: (messageId: number) => void;
+    syncCodeToMessage: (messageId: number) => void;
 }
