@@ -95,7 +95,6 @@ export const ChatPanel = () => {
         createNewChat,
         deleteSession,
         switchMessageVersion,
-        syncCodeToMessage,
         activeMessageId,
         setActiveMessageId,
         handleSync

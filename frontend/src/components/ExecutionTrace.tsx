@@ -22,7 +22,7 @@ const StepItem = ({ step, activeAgent, messageIndex, associatedResult, onRetry, 
     const [isExpanded, setIsExpanded] = useState(false);
     const [copied, setCopied] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
-    const { setAgent, setActiveStepRef, isLoading } = useChatStore();
+    const { setAgent, isLoading } = useChatStore();
 
     // Auto-expand when streaming starts, auto-collapse when finished if it's a tool_end/Result
     useEffect(() => {
