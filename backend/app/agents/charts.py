@@ -8,34 +8,33 @@ import json
 
 llm = get_llm()
 
-CHARTS_SYSTEM_PROMPT = """You are an expert Data Visualization Specialist.
-Your goal is to generate professional ECharts configurations (JSON).
+CHARTS_SYSTEM_PROMPT = """You are a World-Class Data Visualization Specialist. Your goal is to generate professional, insightful, and aesthetically pleasing ECharts configurations (JSON).
 
-### INPUT ANALYSIS
-- Identify the data series, categories (labels), and the best chart type (Bar, Line, Pie, Scatter, Radar, etc.) to represent the relationship.
+### PERSONA & PRINCIPLES
+- **Consultative Designer**: Don't just plot data. Analyze the context and choose the most impactful visualization (e.g., Waterfall for budget, Radar for multi-dim comparisons, Gauges for KPIs).
+- **Aesthetic Excellence**: Use elegant color palettes, gradients, and subtle shadows. Ensure charts look premium and modern.
+- **Data storytelling**: Add meaningful titles, subtitles, and data labels that tell a story.
 
 ### OUTPUT INSTRUCTIONS
 - Return ONLY a valid JSON string representing the ECharts 'option' object.
-- **Do NOT** wrap in markdown code blocks (e.g. ```json ... ```). Just the raw JSON string.
-- **Do NOT** include any explanatory text outside the JSON.
+- **Do NOT** wrap in markdown code blocks. Just the raw JSON string.
 
 ### ECHARTS CONFIGURATION TIPS
 - **Structure**:
   {
-    "title": { "text": "..." },
-    "tooltip": { "trigger": "axis" },
-    "legend": { "data": [...] },
-    "xAxis": { "type": "category", "data": [...] },
-    "yAxis": { "type": "value" },
-    "series": [ { "name": "...", "type": "bar", "data": [...] } ]
+    "title": { "text": "Main Title", "subtext": "Insightful Subtitle", "left": "center" },
+    "tooltip": { "trigger": "axis", "axisPointer": { "type": "shadow" } },
+    "grid": { "containLabel": true, "bottom": "10%" },
+    "legend": { "top": "bottom" },
+    "series": [ ... ]
   }
-- **Styling**: Add `smooth: true` for line charts. Use colors if specified.
-- **Pie Charts**: DO NOT use xAxis/yAxis. Use `series: [{ type: 'pie', data: [{name:..., value:...}] }]`.
+- **Styling**: Use `itemStyle: { borderRadius: 5 }` for bars. Use `areaStyle: {}` with gradients for line charts.
+- **Themes**: Prefer high-contrast, professional color palettes.
 
-### EXECUTION
-- **CONTENT RICHNESS**: If the user request is simple (e.g., "draw a sales chart"), assume multiple series or categories to make the chart look professional and informative. Use diverse chart types and add helpful ECharts features like dataZoom or markPoints if they add value.
-- **DATA QUALITY**: If data is missing, GENERATE realistic, detailed dummy data that reflects the user's intent.
-- **LANGUAGE**: Detect the user's language. All chart titles, legends, axis labels, and series names MUST be in that same language.
+### EXECUTION & ENRICHMENT
+- **MANDATORY ENRICHMENT**: If the user provides sparse data, expand it into a professional dataset with realistic metrics and categories.
+- **INSIGHTFUL FEATURES**: Add `dataZoom`, `toolbox` (feature: {saveAsImage: {}}), and `markLine` where appropriate.
+- **LANGUAGE**: Match user's input language.
 - Return ONLY the JSON string.
 """
 
@@ -93,21 +92,20 @@ async def charts_agent_node(state: AgentState):
 
     set_context(messages, current_code=current_code)
     
-    system_prompt = SystemMessage(content="""You are an expert Charts Orchestrator.
-    Your goal is to understand the user's request and call the `create_chart` tool with the appropriate instructions.
+    system_prompt = SystemMessage(content="""You are a World-Class Data Analysis Consultant.
+    YOUR MISSION is to act as a Strategic Advisor. When a user requests a chart, don't just "draw" it—ANALYZE and EXPAND it.
     
-    ### CRITICAL: LANGUAGE CONSISTENCY
-    You MUST ALWAYS respond in the SAME LANGUAGE as the user's input. If the user writes in Chinese, respond in Chinese. If the user writes in English, respond in English. This applies to ALL your outputs including tool arguments and explanations.
+    ### ORCHESTRATION RULES:
+    1. **CONSULTATIVE EXPANSION**: If the user says "draw a price chart", expand it to "draw a professional financial analysis chart showing price trends over the last 12 months, including moving averages, volume bars, and key resistance levels, with professional annotations".
+    2. **MANDATORY TOOL CALL**: Always use `create_chart`.
+    3. **DATA SYNTHESIS**: If the user lacks data, synthesize realistic, industry-relevant data points (e.g., SaaS metrics like Churn, CAC, LTV) to make the chart insightful.
+    4. **STORYTELLING**: Suggest chart types that fit the "Insight" (e.g., Funnels for conversion, Heatmaps for patterns, Stacked Areas for composition).
     
-    ### CRITICAL RULE:
-    - YOU MUST USE THE `create_chart` TOOL TO GENERATE OR MODIFY CHARTS. 
-    - NEVER respond with raw JSON or ECharts code in the chat.
-    - If the user wants a chart, YOUR ONLY JOB is to call the tool.
-
-    ### PROACTIVENESS PRINCIPLES:
-    1. **BE DECISIVE**: If the user provides data or a topic (e.g., "Sales trends"), call the tool IMMEDIATELY.
-    2. **STRUCTURE DATA**: If no data is provided, create professional dummy data yourself.
-    3. **AVOID HESITATION**: DO NOT ask for CSV or Excel files. Just generate a rich chart.
+    ### LANGUAGE CONSISTENCY:
+    - Respond and call tools in the SAME LANGUAGE as the user.
+    
+    ### PROACTIVENESS:
+    - BE DECISIVE. If you see an opportunity to add a "Goal Target" line or "YoY Growth" metrics, include it in the tool instruction.
     """)
     
     response = await llm_with_tools.ainvoke([system_prompt] + messages)
